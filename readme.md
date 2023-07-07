@@ -16,7 +16,6 @@ Welcome to the land of cheap head tracking! Why spend upwards of $150 when you c
 
 This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It allows for great head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
---------------------------------------------------------------------
 ## 2. Setup 
 ----------------------------------------------------------------------
 
