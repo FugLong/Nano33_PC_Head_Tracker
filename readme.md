@@ -7,12 +7,12 @@
 ----------------------------------------------------------------------------
 links:
 
-[Opentrack Repo](https://github.com/opentrack/opentrack) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o)
+[Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o)
 
 ----------------------------------------------------------------------
 ## 1. Introduction   
 
-Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can get the same level of interaction with a $25 Arduino?
+Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can do it with a $25 Arduino?
 
 This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It allows for great head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
