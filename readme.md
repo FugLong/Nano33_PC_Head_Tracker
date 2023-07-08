@@ -21,7 +21,7 @@ links:
 
 Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can do it with a $25 Arduino?
 
-This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
+This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
 ## 2. Prerequisites 
 
@@ -31,7 +31,7 @@ Otherwise, you will need to start by grabbing some links from the link section o
   - Opentrack software
     - Head to the releases page [here](https://github.com/opentrack/opentrack/releases) and download the latest installer/executable for your OS.
     - This is an open source PC program that widely supports head tracking in virtually any game. We won't need this until we're done flashing our board.
-  - Arduino Editor or VS Code
+  - Arduino Editor or VS Code (more involved)
     - Go to the arduino software page [here](https://www.arduino.cc/en/software) or the VS code download page [here](https://code.visualstudio.com/download) and download the latest version for your OS.
     - This is what we'll use to install this library, its dependencies, and flash our calibration programs and head tracking code to our arduino.
   - This repo
@@ -80,4 +80,21 @@ To load the various files you'll need, go to **File>Examples>Nano33 PC Head Trac
 
 ## 3. Setup (VS Code)
 
+**The VS code setup will be less detailed as I expect mainly experienced users will use it.**
+
+First, open up VS code and install the Arduino extension from the extension menu. When installing, select CLI on the bottom right, the gui will be removed soon. (Restart VS code to make sure the new UI elements show up)
+
+Then, open up the nano 33 head tracking folder, either from a local git clone you've made or by downloading the zip and extracting.
+
+All of the settings we need can be accessed by hitting the shortcut **Ctrl+Shift+P**. From the drop down select "Arduino: Board Manager" and a UI panel should open up. Install "Arduino Mbed OS Nano Boards" by Arduino. 
+
+Next, hit Ctrl+Shift+P again and select "Arduino: Library Manager". From there, install "ArduinoBLE" and "SensorFusion".
+
+Finally, at the very bottom of the screen on the right, there are options to select board and port. Make sure to set your board and port (arduino needs to be plugged in).
+
+All the files you need are in the **examples** folder. To upload, you can use the same drop down menu, or you can click the little icon in the top right that looks like an arrow pointing into a full bucket.
+
+## 4. Calibration
+
 WIP
+
