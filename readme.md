@@ -17,6 +17,17 @@ links:
 [Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [VS Code Download](https://code.visualstudio.com/download) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o) | [3D Printable Holder for Nano 33](https://www.thingiverse.com/thing:6111323)
 
 ----------------------------------------------------------------------
+
+## Contents: 	
+1. Introduction
+2. Prerequisites
+3. Setup (Arduino Editor)
+4. Setup (VS Code)
+5. Calibration
+6. Flashing Head Tracking Code
+7. Configuring Opentrack
+8. LED Indicator Meanings
+
 ## 1. Introduction   
 
 Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can do it with a $25 Arduino?
@@ -80,7 +91,7 @@ To load the various files you'll need, go to **File>Examples>Nano33 PC Head Trac
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/71e769bf-6738-4994-92d9-7d9f1d8167d5">
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/8555b8e8-6e99-4297-aa15-78958425431d">
 
-## 3. Setup (VS Code)
+## 4. Setup (VS Code)
 
 **The VS code setup will be less detailed as I expect mainly experienced users will use it.**
 
@@ -96,7 +107,7 @@ Finally, at the very bottom of the screen on the right, there are options to sel
 
 All the files you need are in the **examples** folder. To upload, you can use the same drop down menu, or you can click the little icon in the top right that looks like an arrow pointing into a full bucket.
 
-## 4. Calibration
+## 5. Calibration
 
 Calibration is done in 3 parts and can be finicky but thankfully you really only need to do it once. Femme Verbeek's fork of the Arduino_LSM9DS1 library adds easy calibration and he even made a [fantastic video](https://youtu.be/BLvYFXoP33o) showing how to do each type so his fork is what this repo is based on. 
 
@@ -162,7 +173,7 @@ Finally you are done and can copy the "Magnetometer code" and paste it in your d
     IMU.setMagnetOffset(-3.352051, -1.088867, 22.079468);
     IMU.setMagnetSlope (2.696329, 1.037236, 1.078650);
 
-## 5. Adding Calibration data and flashing head tracking code
+## 6. Flashing Head Tracking Code
 
 You're on the home stretch now. You can close all of the calibration files if they're still open, except for your data text file, leave that open.
 
@@ -197,7 +208,7 @@ It should look something like this:
 
 Now you're done on the arduino side. Flash the ino to your board and you can close arduino editor/VS code. 
 
-## 6. Configuring Opentrack
+## 7. Configuring Opentrack
 
 The last and final step is getting opentrack configured to listen to our arduino. Open up opentrack and set the input dropdown to "Hatire Arduino".
 
@@ -210,7 +221,7 @@ On the "command" tab of the settings menu you can leave most things the same but
 
 Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, set inversions if necessary, and start gaming.
 
-## 7. LED Indicator meanings
+## 8. LED Indicator Meanings
 
   - Purple
     - Booting up
