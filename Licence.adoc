@@ -1,8 +1,10 @@
-= LSM9DS1 Library for Arduino =
+= Nano 33 Head Tracker / LSM9DS1 Library for Arduino =
 
 image:https://github.com/arduino-libraries/Arduino_LSM9DS1/workflows/Compile%20Examples/badge.svg["Compile Examples Status", link="https://github.com/arduino-libraries/Arduino_LSM9DS1/actions?workflow=Compile+Examples"] image:https://github.com/arduino-libraries/Arduino_LSM9DS1/workflows/Spell%20Check/badge.svg["Spell Check Status", link="https://github.com/arduino-libraries/Arduino_LSM9DS1/actions?workflow=Spell+Check"]
 
-Allows you to read the accelerometer, magnetometer and gyroscope values from the LSM9DS1 IMU on your Arduino Nano 33 BLE Sense.
+Nano33_PC_Head_Tracker allows you to integrate an arduino with the LSM9DS1 imu with opentrack on PC for easy head tracking in virtually any game!
+
+Arduino_LSM9DS1 allows you to read the accelerometer, magnetometer and gyroscope values from the LSM9DS1 IMU on your Arduino Nano 33 BLE Sense.
 For more accurate measurements the sensor must be calibrated first.
 
 == License ==
