@@ -14,7 +14,7 @@
 
 links:
 
-[Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o) | [3D Printable Holder for Nano 33](https://www.thingiverse.com/thing:6111323)
+[Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [VS Code Download](https://code.visualstudio.com/download) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o) | [3D Printable Holder for Nano 33](https://www.thingiverse.com/thing:6111323)
 
 ----------------------------------------------------------------------
 ## 1. Introduction   
@@ -27,15 +27,16 @@ This project is based around the LSM9DS1 IMU, specifically targeting the arduino
 
 First thing's first, you need an arduino with an LSM9DS1 and a usb cord. I know this works on the Nano 33 BLE, and sense versions at least. If you have other hardware and are code savvy then you should have no problem porting this to other IMUs/Ardys. If that's the case just grab the head tracker from the examples folder and ignore everything else.
 
-Otherwise, you will need to start by grabbing some links from the link section. 
+Otherwise, you will need to start by grabbing some links from the link section or down below. 
   - Opentrack software
     - Head to the releases page [here](https://github.com/opentrack/opentrack/releases) and download the latest installer/executable for your OS.
     - This is an open source PC program that widely supports head tracking in virtually any game. We won't need this until we're done flashing our board.
-  - Arduino Editor
-    - Go to the arduino software page [here](https://www.arduino.cc/en/software) and download the latest version for your OS.
+  - Arduino Editor or VS Code
+    - Go to the arduino software page [here](https://www.arduino.cc/en/software) or the VS code download page [here](https://code.visualstudio.com/download) and download the latest version for your OS.
     - This is what we'll use to install this library, its dependencies, and flash our calibration programs and head tracking code to our arduino.
   - This repo
-    - Download this repo as a zip, we will be installing it as a library inside of arduino editor.
+    - If using Arduino editor, download this repo as a zip, we will be installing it as a library.
+    - If you want to use VS code, clone this repo with git and open in vscode. 
    
 These things aren't prerequisites but are worth having:
   - Velcro Tape
@@ -47,12 +48,12 @@ These things aren't prerequisites but are worth having:
     - [This](https://www.thingiverse.com/thing:6111323) is a 3d printed sleeve for the arduino that helps protect it as well as create a perfect spot to attach sticky tape/velcro. (also in the links section)
     - In the future I have plans on creating another version with room for a battery for fully wireless operation. Will link here when done.
       
-## 3. Setup
+## 3. Setup (Arduino Editor)
 
 Start by booting up Arduino Editor.
 
 #### **VERY IMPORTANT:**
-In the Library Manager tab on the left bar, you must make sure you do **NOT** have the library "Arduino_LSM9DS1" installed.
+In the Library Manager tab on the left bar, you must make sure you do **NOT** have the library "Arduino_LSM9DS1" by Arduino installed.
 
 Now Go to **Sketch>Include Library>Add .ZIP Library** and point it where you downloaded this repo. It should install the library and ask you if you want to install dependencies. Say yes. 
 
@@ -61,6 +62,22 @@ Now Go to **Sketch>Include Library>Add .ZIP Library** and point it where you dow
 
 If it doesn't prompt you to install dependencies, click on the left Library Manager tab and search for "ArduinoBLE" and "SensorFusion" and add them.
 
-------------------------------------------------------
+------------------
 
-....WIP
+Next, click on board manager, the button above the library manager. You need to install "Arduino Mbed OS Nano Boards" by Arduino. Then click on select board on the top bar and select your board (it should be plugged in).
+
+<img width="350" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/0ebc6117-e0c4-4a5b-8c26-8dcf9cb3f326">
+<img width="500" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/24477d61-ddf4-4a8a-a737-04159339aa90">
+
+-------------------
+
+The last arduino editor specific setup topic is where to find the calibration and head tracking code, and how to upload it to the board.
+
+To load the various files you'll need, go to **File>Examples>Nano33 PC Head Tracker>**. When time comes to upload to your board, press the big upload button on the top left (it has an arrow pointing to the right).
+
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/71e769bf-6738-4994-92d9-7d9f1d8167d5">
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/8555b8e8-6e99-4297-aa15-78958425431d">
+
+## 3. Setup (VS Code)
+
+WIP
