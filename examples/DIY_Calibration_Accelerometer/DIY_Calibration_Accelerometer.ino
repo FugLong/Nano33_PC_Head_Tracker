@@ -28,8 +28,8 @@ float maxAX = 1, maxAY=1, maxAZ=1, minAX=-1, minAY=-1, minAZ=-1; // Accel Slope
 float zeroAX1 =0,zeroAX2 =0,zeroAY1 =0,zeroAY2 =0,zeroAZ1 =0,zeroAZ2 =0;  //Accel Offset
 boolean accelOK=false;
 uint8_t acceMMlOK=0; // bit 0..2 maxXYZ bit 3..5 minXYZ
-uint8_t accelODRindex=5; // Sample Rate 0:off, 1:10Hz, 2:50Hz, 3:119Hz, 4:238Hz, 5:476Hz, (6:952Hz=na) 
-uint8_t accelFSindex=3;   // Full Scale// 0: ±2g ; 1: ±24g ; 2: ±4g ; 3: ±8g
+uint8_t accelODRindex=2; // Sample Rate 0:off, 1:10Hz, 2:50Hz, 3:119Hz, 4:238Hz, 5:476Hz, (6:952Hz=na) 
+uint8_t accelFSindex=0;   // Full Scale// 0: ±2g ; 1: ±24g ; 2: ±4g ; 3: ±8g
 
 void setup() {
   Serial.begin(115200); 

@@ -29,7 +29,7 @@
 float EarthMagnetStrength = 49.0;  //= µT
 
 boolean magnetOK=false;
-uint8_t magnetODRindex=8;  // (0..8)->{0.625,1.25,2.5,5.0,10,20,40,80,400}Hz
+uint8_t magnetODRindex=7;  // (0..8)->{0.625,1.25,2.5,5.0,10,20,40,80,400}Hz
 uint8_t magnetFSindex=0;   // 0=±400.0; 1=±800.0; 2=±1200.0 , 3=±1600.0  (µT) 
 
 

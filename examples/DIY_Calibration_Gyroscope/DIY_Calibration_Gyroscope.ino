@@ -38,8 +38,8 @@ const float gyroSlopeCriterion = 50;  //Smaller value requires more pureness of 
 char xyz[3]= {'X','Y','Z'};
 boolean gyroOffsetOK=false;
 boolean gyroSlopeOK[3]={false,false,false};
-uint8_t gyroODRindex=5;
-uint8_t gyroFSindex=2;   // (0= ±245 dps; 1= ±500 dps; 2= ±1000 dps; 3= ±2000 dps)
+uint8_t gyroODRindex=2;
+uint8_t gyroFSindex=1;   // (0= ±245 dps; 1= ±500 dps; 2= ±1000 dps; 3= ±2000 dps)
 
 void setup() {
   Serial.begin(115200); 

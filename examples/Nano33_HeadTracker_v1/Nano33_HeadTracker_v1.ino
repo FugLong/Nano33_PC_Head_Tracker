@@ -196,20 +196,20 @@ void setup() {
     // Accelerometer code
     IMU.setAccelFS(0);
     IMU.setAccelODR(2);
-    IMU.setAccelOffset(-0.010573, -0.013723, -0.008323);
-    IMU.setAccelSlope (0.995522, 1.013914, 1.005888);
+    IMU.setAccelOffset(0.000000, 0.000000, 0.000000);
+    IMU.setAccelSlope (1.000000, 1.000000, 1.000000);
 
     // Gyroscope code
     IMU.setGyroFS(1);
     IMU.setGyroODR(2);
-    IMU.setGyroOffset (0.318680, -0.165939, 0.185928);
-    IMU.setGyroSlope (1.163980, 1.116704, 1.132782);
+    IMU.setGyroOffset (0.000000, 0.000000, 0.000000);
+    IMU.setGyroSlope (1.000000, 1.000000, 1.000000);
 
     // Magnetometer code
     IMU.setMagnetFS(0);
     IMU.setMagnetODR(7);
-    IMU.setMagnetOffset(-3.352051, -1.088867, 22.079468);
-    IMU.setMagnetSlope (2.696329, 1.037236, 1.078650);
+    IMU.setMagnetOffset(0.000000, 0.000000, 0.000000);
+    IMU.setMagnetSlope (1.000000, 1.000000, 1.000000);
     //--------------------------------------------------------------------------------------------------
     //--------------------------------------------------------------------------------------------------
   }
