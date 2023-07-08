@@ -21,9 +21,9 @@ links:
 
 Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can do it with a $25 Arduino?
 
-This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
+This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimized so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
-WIP Updates: Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. 
+WIP Updates: Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. Also bluetooth is currently working but requires a python based bluetooth to serial program running on the PC that is lame and keeps breaking for me. If I optimize it more I will link the bluetooth to serial program. 
 
 ## 2. Prerequisites 
 
@@ -209,3 +209,17 @@ On the "command" tab of the settings menu you can leave most things the same but
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/86313e00-2eee-4bc6-b9aa-8dadd755f7bb">
 
 Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, set inversions if necessary, and start gaming.
+
+## 7. LED Indicator meanings
+
+  - Purple
+    - Booting up
+  - Red
+    - Waiting for Bluetooth or Serial connection
+  - Flashing Red
+    - IMU not found or not working
+  - Green power LED only
+    - Functioning as intended, running tracking code
+  - Green power LED + Orange data LED
+    - Uploading script
+
