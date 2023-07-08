@@ -88,13 +88,122 @@ Then, open up the nano 33 head tracking folder, either from a local git clone yo
 
 All of the settings we need can be accessed by hitting the shortcut **Ctrl+Shift+P**. From the drop down select "Arduino: Board Manager" and a UI panel should open up. Install "Arduino Mbed OS Nano Boards" by Arduino. 
 
-Next, hit Ctrl+Shift+P again and select "Arduino: Library Manager". From there, install "ArduinoBLE" and "SensorFusion".
+Next, hit Ctrl+Shift+P again and select "Arduino: Library Manager". From there, install "ArduinoBLE" and "SensorFusion". If you have "Arduino_LSM9DS1" installed make absolutely sure you remove it before proceeding. (If you have to delete it, restart VS code after)
 
-Finally, at the very bottom of the screen on the right, there are options to select board and port. Make sure to set your board and port (arduino needs to be plugged in).
+Finally, at the very bottom of the screen on the right, there are options to select board and port. Make sure to set your board and port (arduino needs to be plugged in). Don't worry about selecting a programmer.
 
 All the files you need are in the **examples** folder. To upload, you can use the same drop down menu, or you can click the little icon in the top right that looks like an arrow pointing into a full bucket.
 
 ## 4. Calibration
 
-WIP
+Calibration is done in 3 parts and can be finicky but thankfully you really only need to do it once. Femme Verbeek's fork of the Arduino_LSM9DS1 library adds easy calibration and he even made a [fantastic video](https://youtu.be/BLvYFXoP33o) showing how to do each type so his fork is what this repo is based on. 
 
+If anything here isn't immediately clear, check out the tutorial video above to make sure you're doing it right.
+
+To start, create a text file somewhere you'll remember and call it something like "headTracker_calibrationData". Leave it open.
+
+---------------------
+
+For the first calibration step upload the **"DIY_Calibration_Accelerometer"** ino to your board from the examples folder.
+
+Once uploaded open up the serial monitor. In the arduino editor, it's the button on the far top right; in VS Code there's a tab for it where the terminal and output tabs are.
+
+You should see the calibration dialogue. This one is the easiest. You need to put the board flat and completely still on it's back, front, top, bottom, left, and right. This is where the calibration box comes in. I have a 3d printable calibration box available in the links that makes this a lot easier, but you can just tape/velcro/glue the board inside of the box it came in and it works great. 
+
+Once the device is stable and level, type C in the input and hit enter. You repeat this for all sides of the box. The program will autodetect which axis and direction you are doing and keeps track of which are complete.
+
+Once all axis are OK, copy the "Accelerometer code" and paste it in your data text file. It should look something like this:
+
+    // Accelerometer code
+    IMU.setAccelFS(0);
+    IMU.setAccelODR(2);
+    IMU.setAccelOffset(-0.010573, -0.013723, -0.008323);
+    IMU.setAccelSlope (0.995522, 1.013914, 1.005888);
+
+----------------------
+
+For the second calibration step upload the **"DIY_Calibration_Gyroscope"** ino to your board from the examples folder.
+
+Just like before open the serial monitor and make sure you see the gryo calibration dialogue. This step has 2 parts. The first part is just like the previous calibration, but the second part is more involved.
+
+To start, make sure your board is level and not moving at all on its back. Then type O in the input, hit enter, and wait for offsets to calibrate. That's the first part done.
+
+Next, you will need to type C into the input, hit enter, smoothly rotate the device 180 degrees over just one axis, then hit enter again. This can be done by keeping one side of your calibration box on a table and rotating it around in a semi circle while keeping it on the table the whole time. This will need to be done 3 times, once for each axis. Check the video if this doesn't make sense right away.
+
+Once this is done copy the "Gyroscope code" and paste it in your data text file below the accel code. It should look something like this:
+
+    // Gyroscope code
+    IMU.setGyroFS(1);
+    IMU.setGyroODR(2);
+    IMU.setGyroOffset (0.318680, -0.165939, 0.185928);
+    IMU.setGyroSlope (1.163980, 1.116704, 1.132782);
+
+-----------------------
+
+For the third and final calibration step upload the **"DIY_Calibration_Magnetometer"** ino to your board from the examples folder.
+
+Then, open serial monitor again and make sure you see the dialogue. 
+
+This one is the weirdest. First off, go to [this](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) website and enter your approximate location on the right. It will convert to lat and lon and you can get local mag data. Look specifically at **Inclination** and **Total Field**. 
+
+Now type L in the serial monitor, hit enter, and then type your local total field strength and hit enter again.
+
+For this next part you need a compass or a compass app on your phone and I highly recommend watching the video for a visual aid. Open it up and align your phone with north. Then align your board with north and tilt it along your local inclination line like in the video. Now not going to lie I could not find where he got that print out in the video, so I just based my inclination angle roughly where it should be relative to the line in his video. 
+
+Once it's in the proper orientation, type C into the input and hit enter. Then rotate it along all the axis while keeping it aligned with north and your inclination line. Once you have rotated all axis around 360, hit enter again to stop calibrating. 
+
+Finally you are done and can copy the "Magnetometer code" and paste it in your data text file below the gyro code. It should look something like this:
+
+    // Magnetometer code
+    IMU.setMagnetFS(0);
+    IMU.setMagnetODR(7);
+    IMU.setMagnetOffset(-3.352051, -1.088867, 22.079468);
+    IMU.setMagnetSlope (2.696329, 1.037236, 1.078650);
+
+## 5. Adding Calibration data and flashing head tracking code
+
+You're on the home stretch now. You can close all of the calibration files if they're still open, except for your data text file, leave that open.
+
+The last thing we need to flash to the arduino is the actual head tracking code, but first you need to paste your calibration data in.
+
+Open up the **"Nano33_HeadTracker_v1"** ino file and scroll down to line 195, or where you see a big comment block that says "PASTE YOUR CALIBRATION DATA HERE".
+There will be default dummy data there in the same format as your calibration text doc. Highlight everything within that comment and replace it with your data.
+
+It should look something like this:
+
+    //----------------------------------Set calibration data--------------------------------------------
+    //----------------------------PASTE YOUR CALIBRATION DATA HERE--------------------------------------
+    // Accelerometer code
+    IMU.setAccelFS(0);
+    IMU.setAccelODR(2);
+    IMU.setAccelOffset(-0.010573, -0.013723, -0.008323);
+    IMU.setAccelSlope (0.995522, 1.013914, 1.005888);
+
+    // Gyroscope code
+    IMU.setGyroFS(1);
+    IMU.setGyroODR(2);
+    IMU.setGyroOffset (0.318680, -0.165939, 0.185928);
+    IMU.setGyroSlope (1.163980, 1.116704, 1.132782);
+
+    // Magnetometer code
+    IMU.setMagnetFS(0);
+    IMU.setMagnetODR(7);
+    IMU.setMagnetOffset(-3.352051, -1.088867, 22.079468);
+    IMU.setMagnetSlope (2.696329, 1.037236, 1.078650);
+    //--------------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------------------------------
+
+Now you're done on the arduino side. Flash the ino to your board and you can close arduino editor/VS code. 
+
+## 6. Configuring Opentrack
+
+The last and final step is getting opentrack configured to listen to our arduino. Open up opentrack and set the input dropdown to "Hatire Arduino".
+
+Now click the settings button to the right of the hatire dropdown. In the first settings menu, make sure to set your active com port if it's not already selected and **disable roll**. (Roll currently breaks EVERYTHING, hope to fix in the future)
+
+On the "command" tab of the settings menu you can leave most things the same but you **HAVE** to make sure you check the "DTR" checkbox.
+
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/239064b9-c8b7-4ed9-852c-a280bd611125">
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/86313e00-2eee-4bc6-b9aa-8dadd755f7bb">
+
+Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, and start gaming.
