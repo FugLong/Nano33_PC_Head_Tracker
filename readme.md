@@ -20,6 +20,7 @@ links:
 
 ## Contents: 	
 1. Introduction
+    * WIP Updates
 2. Prerequisites
 3. Setup (Arduino Editor)
 4. Setup (VS Code)
@@ -34,7 +35,13 @@ Welcome to the land of cheap head tracking! Why spend upwards of $150 when you c
 
 This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimized so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
-WIP Updates: Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. Also bluetooth is currently working but requires a python based bluetooth to serial program running on the PC that is lame and keeps breaking for me. If I optimize it more I will link the bluetooth to serial program. 
+### WIP Updates: 
+
+Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. 
+
+Also having axis limit issues that should be fixed soon. If yaw is acting weird for you or locking out, try rotating the board 180 degrees on the yaw axis and resetting. If that works but you don't want it aligned that way, subtract 180 from the yaw output in the tracking code.
+
+Bluetooth is technically currently working but requires a python based bluetooth to serial program running on the PC that is lame and keeps breaking for me. If I optimize it more I will link the bluetooth to serial program. Also considering 2 arduino client server setup to get around the program and use real serial.
 
 ## 2. Prerequisites 
 
@@ -219,7 +226,12 @@ On the "command" tab of the settings menu you can leave most things the same but
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/239064b9-c8b7-4ed9-852c-a280bd611125">
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/86313e00-2eee-4bc6-b9aa-8dadd755f7bb">
 
-Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, set inversions if necessary, and start gaming.
+Lastly, click on the "Mapping" button in the main opentrack ui. Change yaw max input to 180, and same with pitch input and output. If you want you can add some points on the curves to add some deadzone or snappier movement near the max. You can now click start on opentrack and see how it works. If necessary use the hatire settings menu to invert axis to get them the right way for you. Stopping opentrack will stop the arduino code and put it back into waiting mode.
+
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/fa222686-fa3a-464a-bb85-d7d4bc04a4f9">
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/49b6482a-d6c6-48f8-80d6-05898ae4d12a">
+
+Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, and start gaming.
 
 ## 8. LED Indicator Meanings
 
