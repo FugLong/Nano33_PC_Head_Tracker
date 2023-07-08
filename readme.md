@@ -14,7 +14,7 @@
 
 links:
 
-[Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [VS Code Download](https://code.visualstudio.com/download) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o) | [3D Printable Holder for Nano 33](https://www.thingiverse.com/thing:6111323)
+[Opentrack Releases](https://github.com/opentrack/opentrack/releases) | [Arduino Editor DL](https://www.arduino.cc/en/software) | [VS Code Download](https://code.visualstudio.com/download) | [Geomagnetic Calculator of the NOAA](https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml?#igrfwmm) | [Femme Verbeek's Calibration Docs](https://github.com/FemmeVerbeek/Arduino_LSM9DS1) | [Femme Verbeek's Calibration Instruction Video](https://youtu.be/BLvYFXoP33o) | [3D Printable Holder for Nano 33](https://www.thingiverse.com/thing:6111323) | [3D Printable Calibration Box](https://www.thingiverse.com/thing:6113315) 
 
 ----------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ links:
 
 Welcome to the land of cheap head tracking! Why spend upwards of $150 when you can do it with a $25 Arduino?
 
-This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimized so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
+This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering.
 
 ### WIP Updates: 
 
@@ -62,7 +62,7 @@ These things aren't prerequisites but are worth having:
   - Velcro Tape
     - I got some very sticky velcro tape from amazon for like $10. It is very helpful when calibrating and when attaching the device to my headset.
   - A small box
-    - This can be a small 3d printed box (I plan to make a 3d printable one soon and will link here), or even the paper box your arduino came in (that's what I used).
+    - This can be a small 3d printed box like [this](https://www.thingiverse.com/thing:6113315) one I made, or even the paper box your arduino came in (that's what I used at first).
     - This is for calibration only, if you have the hands of a surgeon maybe you could go without it but it is very helpful.
   - 3D Printed Holder
     - [This](https://www.thingiverse.com/thing:6111323) is a 3d printed sleeve for the arduino that helps protect it as well as create a perfect spot to attach sticky tape/velcro. (also in the links section)
