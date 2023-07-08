@@ -23,6 +23,8 @@ Welcome to the land of cheap head tracking! Why spend upwards of $150 when you c
 
 This project is based around the LSM9DS1 IMU, specifically targeting the arduino nanos that use this IMU. It has decent (for now) head tracking, integration with opentrack so you can use it in virtually any game, and requires no coding or soldering. Bluetooth mode is currently supported but requires an extra PC program and is not yet optimised so wired over USB is the current recommended setup. In the future I plan to try out some wifi based solutions but that's not a main priority currently. 
 
+WIP Updates: Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. 
+
 ## 2. Prerequisites 
 
 First thing's first, you need an arduino with an LSM9DS1 and a usb cord. I know this works on the Nano 33 BLE, and sense versions at least. If you have other hardware and are code savvy then you should have no problem porting this to other IMUs/Ardys. If that's the case just grab the head tracker from the examples folder and ignore everything else.
@@ -206,4 +208,4 @@ On the "command" tab of the settings menu you can leave most things the same but
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/239064b9-c8b7-4ed9-852c-a280bd611125">
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/86313e00-2eee-4bc6-b9aa-8dadd755f7bb">
 
-Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, and start gaming.
+Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, set inversions if necessary, and start gaming.
