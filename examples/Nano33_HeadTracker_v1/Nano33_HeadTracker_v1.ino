@@ -13,7 +13,7 @@
 #define LED_PWR     (25u)
 
 //TEST MODE ENABLE OR DISABLE
-bool TestMode = false; //Set true to output data directly to serial (bypass hatire conversion + centering)
+bool TestMode = false; //Set true to output data directly to serial (bypass hatire conversion + range mapping)
 
 //Variables only required in test mode
 int loopFrequency = 0;
@@ -83,7 +83,6 @@ void sendAnglesToHatire() {
 // Updates the IMU and fusion filter to get new data //
 ///////////////////////////////////////////////////////
 void updateAngles() {
-
   // ------Check for new IMU data and update angles------
   //update gryo if available
   if (IMU.gyroAvailable()) {
@@ -118,9 +117,9 @@ void updateAngles() {
   if (TestMode){
     //  Display sensor data every displayPeriod, non-blocking.
     if (millis() - previousMillis >= displayPeriod) {
-      Serial.print("Roll:");
+      Serial.print("Pitch:");
       Serial.print(fusion.getRoll());
-      Serial.print("\tPitch:");
+      Serial.print("\tRoll:");
       Serial.print(fusion.getPitch());
       Serial.print("\tYaw:");
       Serial.println(fusion.getYaw());
@@ -135,11 +134,10 @@ void updateAngles() {
     loopFrequency++;
   }
   else {
-
     //Assign yaw, pitch, and roll in hatire struct
-    hat.gyro[0]=fusion.getYaw();
-    hat.gyro[1]=fusion.getPitch();
-    hat.gyro[2]=fusion.getRoll();
+    hat.gyro[0]=map(fusion.getYaw(), 0, 360, -180, 180); //Yaw in opentrack
+    hat.gyro[1]=-fusion.getPitch(); //Roll in opentrack
+    hat.gyro[2]=fusion.getRoll(); //Pitch in opentrack
 
     // Send HAT  Frame to  PC
     sendAnglesToHatire();
