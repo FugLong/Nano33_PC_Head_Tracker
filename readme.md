@@ -39,8 +39,6 @@ This project is based around the LSM9DS1 IMU, specifically targeting the arduino
 
 Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. 
 
-Also having axis limit issues that should be fixed soon. If yaw is acting weird for you or locking out, try rotating the board 180 degrees on the yaw axis and resetting. If that works but you don't want it aligned that way, subtract 180 from the yaw output in the tracking code.
-
 Bluetooth is technically currently working but requires a python based bluetooth to serial program running on the PC that is lame and keeps breaking for me. If I optimize it more I will link the bluetooth to serial program. Also considering 2 arduino client server setup to get around the program and use real serial.
 
 ## 2. Prerequisites 
