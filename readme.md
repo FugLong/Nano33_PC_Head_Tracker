@@ -234,7 +234,7 @@ On the "command" tab of the settings menu you can leave almost everything the sa
 
 --------------------
 
-Lastly, click on the "Mapping" button in the main opentrack ui. Change yaw max input to 180, and same with pitch input and output. Next, set yaw to 90. If you want you can add some points on the curves to add some deadzone or snappier movement near the max (deadzones really help with slight drift). You can now click start on opentrack and see how it works. If necessary use the hatire settings menu to invert axis to get them the right way for you. Stopping opentrack will stop the arduino code and put it back into waiting mode.
+Lastly, click on the "Mapping" button in the main opentrack ui. Change yaw max input to 180, and same with pitch input and output. Next, set roll to 90. If you want you can add some points on the curves to add some deadzone or snappier movement near the max (deadzones really help with slight drift). You can now click start on opentrack and see how it works. If necessary use the hatire settings menu to invert axis to get them the right way for you. Stopping opentrack will stop the arduino code and put it back into waiting mode.
 
 <img width="600" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/9ec8a02b-b683-455c-a0a6-1ccabecb1d87">
 <img width="600" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/fe6680c6-c27c-49a8-8fc2-f228e981fb89">
