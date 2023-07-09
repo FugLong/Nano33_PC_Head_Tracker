@@ -39,6 +39,8 @@ This project is based around the LSM9DS1 IMU, specifically targeting the arduino
 
 Currently there are drift issues I hope to resolve, but performance is still very good. For me it's comparable to single webcam based tracking, so keep a recenter button handy either in opentrack or in game. 
 
+Currently I recommend disabling roll in opentrack settings. It has been giving me weird behavior and even affecting other axis. Once I figure out how to get it in line I'll update this doc.
+
 Bluetooth is technically currently working but requires a python based bluetooth to serial program running on the PC that is lame and keeps breaking for me. If I optimize it more I will link the bluetooth to serial program. Also considering 2 arduino client server setup to get around the program and use real serial.
 
 ## 2. Prerequisites 
@@ -108,9 +110,9 @@ All of the settings we need can be accessed by hitting the shortcut **Ctrl+Shift
 
 Next, hit Ctrl+Shift+P again and select "Arduino: Library Manager". From there, install "ArduinoBLE" and "SensorFusion". If you have "Arduino_LSM9DS1" installed make absolutely sure you remove it before proceeding. (If you have to delete it, restart VS code after)
 
-Finally, at the very bottom of the screen on the right, there are options to select board and port. Make sure to set your board and port (arduino needs to be plugged in). Don't worry about selecting a programmer.
+Finally, at the very bottom of the screen on the right, there are options to select board, file you want to upload, and port. Make sure to set your board and port (arduino needs to be plugged in). Don't worry about selecting a programmer.
 
-All the files you need are in the **examples** folder. To upload, you can use the same drop down menu, or you can click the little icon in the top right that looks like an arrow pointing into a full bucket.
+All the files you need are in the **examples** folder. To upload set the file you want on the bottom bar, then you can use the same drop down menu and select upload, or you can click the little icon in the top right that looks like an arrow pointing into a full bucket (may have to wait for it to compile and click it again).
 
 ## 5. Calibration
 
@@ -215,19 +217,30 @@ Now you're done on the arduino side. Flash the ino to your board and you can clo
 
 ## 7. Configuring Opentrack
 
-The last and final step is getting opentrack configured to listen to our arduino. Open up opentrack and set the input dropdown to "Hatire Arduino".
+The last and final step is getting opentrack configured to listen to our arduino. 
 
-Now click the settings button to the right of the hatire dropdown. In the first settings menu, make sure to set your active com port if it's not already selected and **disable roll**. (Roll currently breaks EVERYTHING, hope to fix in the future)
+First, open up opentrack and set the input dropdown to "Hatire Arduino".
 
-On the "command" tab of the settings menu you can leave most things the same but you **HAVE** to make sure you check the "DTR" checkbox.
+Until I get a weird roll bug figured out, next step is clicking on the big opentrack options button, click on the output tab, and set roll to "Disabled". Roll is hit or miss right now so for reliability, just turn it off.
 
-<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/239064b9-c8b7-4ed9-852c-a280bd611125">
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/ed4b6a39-2716-44b8-b53a-668ed6535fc9">
+
+Now click the settings button to the right of the hatire dropdown. In the first settings menu, make sure to set your active com port if it's not already selected.
+
+On the "command" tab of the settings menu you can leave almost everything the same but you **HAVE** to make sure you check the "DTR" checkbox.
+
+<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/c4c8c50a-6f20-4b65-bbf9-5c7600267488">
 <img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/86313e00-2eee-4bc6-b9aa-8dadd755f7bb">
 
-Lastly, click on the "Mapping" button in the main opentrack ui. Change yaw max input to 180, and same with pitch input and output. If you want you can add some points on the curves to add some deadzone or snappier movement near the max. You can now click start on opentrack and see how it works. If necessary use the hatire settings menu to invert axis to get them the right way for you. Stopping opentrack will stop the arduino code and put it back into waiting mode.
+--------------------
 
-<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/fa222686-fa3a-464a-bb85-d7d4bc04a4f9">
-<img width="450" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/49b6482a-d6c6-48f8-80d6-05898ae4d12a">
+Lastly, click on the "Mapping" button in the main opentrack ui. Change yaw max input to 180, and same with pitch input and output. Next, set yaw to 90. If you want you can add some points on the curves to add some deadzone or snappier movement near the max (deadzones really help with slight drift). You can now click start on opentrack and see how it works. If necessary use the hatire settings menu to invert axis to get them the right way for you. Stopping opentrack will stop the arduino code and put it back into waiting mode.
+
+<img width="600" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/9ec8a02b-b683-455c-a0a6-1ccabecb1d87">
+<img width="600" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/fe6680c6-c27c-49a8-8fc2-f228e981fb89">
+<img width="600" alt="image" src="https://github.com/FugLong/Nano33_PC_Head_Tracker/assets/49841558/522d5d2d-8797-4a74-b3ea-28933660fdd9">
+
+--------------------
 
 Now you're done! You can pick any output type you want (I suggest track-ir for games that support it), click the start button on opentrack, and start gaming.
 
