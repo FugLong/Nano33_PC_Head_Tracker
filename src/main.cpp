@@ -1,9 +1,13 @@
 #include <ArduinoBLE.h>
 #include <Arduino_LSM9DS1.h>
 #include <Fusion/Fusion.h>
-#include <FS_Nano33BLE.h>
+#include <Calibration/Nano33_Calibration.h>
 
-#define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
+//ENABLE OR DISABLE CALIBRATION LOADING/SAVING/APPLYING
+const bool EnableCalibration = true;
+
+//ENABLE OR DISABLE TEST MODE (dev stuff)
+const bool TestMode = false;
 
 // LED Pin definitions
 #define PIN_LED     (13u)
@@ -13,69 +17,50 @@
 #define BLUE       (24u)
 #define LED_PWR    (25u)
 
-// IMU Sample Rate for Fusion AHRS
-#define SAMPLE_RATE (100)
-
 //Timing Code
 unsigned long loopCounter = 0;
 const long RequiredMicros = 5000;
 unsigned long previousMicros = 0;
 unsigned long previousSecond = 0;
 
-// Sensor variables
-float gX = 0, gY = 0, gZ = 0;
-float aX = 0, aY = 0, aZ = 0;
-float mX = 0, mY = 0, mZ = 0;
-float deltat;
+// IMU Sample Rate for Fusion AHRS
+#define SAMPLE_RATE (100)
 
 // Initialise algorithms
 FusionOffset offset;
 FusionAhrs ahrs;
 
-// Define calibration (replace with actual calibration data if available)
-FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-FusionVector gyroscopeSensitivity = {1.0f, 1.0f, 1.0f};
-FusionVector gyroscopeOffset = {0.0f, 0.0f, 0.0f};
-FusionMatrix accelerometerMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-FusionVector accelerometerSensitivity = {1.0f, 1.0f, 1.0f};
-FusionVector accelerometerOffset = {0.0f, 0.0f, 0.0f};
-FusionMatrix softIronMatrix = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-FusionVector hardIronOffset = {0.0f, 0.0f, 0.0f};
-
-struct CalibrationData {
-    bool valid;
-    FusionMatrix gyroscopeMisalignment;
-    FusionVector gyroscopeSensitivity;
-    FusionVector gyroscopeOffset;
-    FusionMatrix accelerometerMisalignment;
-    FusionVector accelerometerSensitivity;
-    FusionVector accelerometerOffset;
-    FusionMatrix softIronMatrix;
-    FusionVector hardIronOffset;
-};
-CalibrationData calibrationData;
-
-// FileSystem object
-FileSystem_MBED *myFS;
-
 // IO Init Tracker
 bool IOInitDone = false;
 
+// Hatire Data Structure
+struct {
+    int16_t Begin;        // Start marker
+    uint16_t Cpt;         // Counter
+    float gyro[3];        // Gyroscope data (Pitch, Roll, Yaw)
+    float acc[3];         // Accelerometer data
+    int16_t End;          // End marker
+} hat = {
+    (int16_t)0xAAAA,      // Start marker
+    0,                    // Counter
+    {0.0f, 0.0f, 0.0f},   // Gyroscope data
+    {0.0f, 0.0f, 0.0f},   // Accelerometer data
+    (int16_t)0x5555       // End marker
+};
+
 // BLE variables + init
 bool BLEconnected = false;
+// BLE Service and Characteristic UUIDs
 const char* deviceServiceUuid = "19b10000-e8f2-537e-4f6c-d104768a1214";
-const char* deviceServiceCharacteristicUuid = "19b10001-e8f2-537e-4f6c-d104768a1214";
-BLEService opentrackService(deviceServiceUuid);
-BLECharacteristic hatireCharacteristic(deviceServiceCharacteristicUuid, BLERead | BLEWrite | BLENotify, 30, true);
+const char* deviceCharacteristicUuid = "19b10001-e8f2-537e-4f6c-d104768a1214";
 
-// Hatire structure
-struct {
-    int16_t Begin;
-    uint16_t Cpt;
-    float gyro[3];
-    float acc[3];
-    int16_t End;
-} hat;
+// BLE Service and Characteristic
+BLEService opentrackService(deviceServiceUuid);
+BLECharacteristic hatireCharacteristic(
+    deviceCharacteristicUuid,
+    BLERead | BLEWrite | BLENotify,
+    sizeof(hat)
+);
 
 ///////////////////////////////////////////////////////////////////
 // Sends HAT structure to Hatire using current communication method
@@ -94,273 +79,25 @@ void sendAnglesToHatire() {
 }
 
 ///////////////////////////////////////////////////////////////////
-// Clear calibration data from flash
-///////////////////////////////////////////////////////////////////
-void clearCalibrationData() {
-    // Check if the file system is initialized
-    if (!myFS) {
-        Serial.println("Error: File system is not initialized. Cannot clear calibration data.");
-        return;
-    }
-
-    Serial.println("Invalidating calibration data...");
-
-    // Attempt to open the calibration file for reading and writing
-    FILE *file = fopen(CALIBRATION_FILE, "r+"); // Open file in read/write mode
-    if (file) {
-        // Read the current calibration data
-        CalibrationData currentData;
-        fread((uint8_t *)&currentData, sizeof(CalibrationData), 1, file);
-
-        // Set the valid flag to false
-        currentData.valid = false;
-
-        // Move the file pointer back to the beginning
-        fseek(file, 0, SEEK_SET);
-
-        // Write the updated data back to the file
-        size_t written = fwrite((uint8_t *)&currentData, sizeof(CalibrationData), 1, file);
-        fclose(file);
-
-        // Verify the write operation
-        if (written == 1) {
-            Serial.println("Calibration data invalidated successfully. Reboot to start fresh calibration.");
-        } else {
-            Serial.println("Error: Failed to update calibration data.");
-        }
-    } else {
-        Serial.println("Error: Failed to open calibration file for updating.");
-    }
-}
-
-///////////////////////////////////////////////////////////////////
-// Save IMU calibration data to flash
-///////////////////////////////////////////////////////////////////
-void saveCalibrationData() {
-    calibrationData.valid = true; // Mark the data as valid
-    FILE *file = fopen(CALIBRATION_FILE, "w");
-    if (file) {
-        fwrite((uint8_t *)&calibrationData, sizeof(CalibrationData), 1, file);
-        fclose(file);
-        Serial.println("Calibration data saved to flash.");
-    } else {
-        Serial.println("Failed to open file for writing calibration data.");
-    }
-}
-
-///////////////////////////////////////////////////////////////////
-// Load IMU calibration data from flash
-///////////////////////////////////////////////////////////////////
-bool loadCalibrationData() {
-    FILE *file = fopen(CALIBRATION_FILE, "r");
-    if (file) {
-        fread((uint8_t *)&calibrationData, sizeof(CalibrationData), 1, file);
-        fclose(file);
-
-        if (calibrationData.valid) {
-            Serial.println("Calibration data loaded from flash:");
-            
-            // Print Gyroscope Calibration
-            Serial.print("Gyro Offsets: ");
-            Serial.print(calibrationData.gyroscopeOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.gyroscopeOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.gyroscopeOffset.axis.z);
-
-            // Print Accelerometer Calibration
-            Serial.print("Accel Offsets: ");
-            Serial.print(calibrationData.accelerometerOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.accelerometerOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.accelerometerOffset.axis.z);
-
-            Serial.print("Accel Sensitivity: ");
-            Serial.print(calibrationData.accelerometerSensitivity.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.accelerometerSensitivity.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.accelerometerSensitivity.axis.z);
-
-            // Print Magnetometer Calibration
-            Serial.print("Mag Hard Iron Offsets: ");
-            Serial.print(calibrationData.hardIronOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.hardIronOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.hardIronOffset.axis.z);
-
-            return true;
-        } else {
-            Serial.println("Calibration data is invalid. Starting calibration sequence.");
-            return false;
-        }
-    } else {
-        Serial.println("No calibration data found. Starting calibration sequence.");
-        return false;
-    }
-}
-
-///////////////////////////////////////////////////////////////////
-// Gyro Calibration
-///////////////////////////////////////////////////////////////////
-void calibrateGyroscope() {
-    Serial.println("Calibrating gyroscope... Place the device stationary and do not move it.");
-    float gXSum = 0, gYSum = 0, gZSum = 0;
-    int samples = 0;
-
-    for (int i = 0; i < 500; i++) { // Collect 500 samples
-        if (IMU.gyroAvailable()) {
-            IMU.readRawGyro(gX, gY, gZ);
-            gXSum += gX;
-            gYSum += gY;
-            gZSum += gZ;
-            samples++;
-        }
-        delay(10); // 10ms delay for 100Hz sampling
-    }
-
-    calibrationData.gyroscopeOffset.axis.x = gXSum / samples;
-    calibrationData.gyroscopeOffset.axis.y = gYSum / samples;
-    calibrationData.gyroscopeOffset.axis.z = gZSum / samples;
-
-    Serial.println("Gyroscope calibration complete.");
-    Serial.print("Offsets: ");
-    Serial.print(calibrationData.gyroscopeOffset.axis.x);
-    Serial.print(", ");
-    Serial.print(calibrationData.gyroscopeOffset.axis.y);
-    Serial.print(", ");
-    Serial.println(calibrationData.gyroscopeOffset.axis.z);
-}
-
-///////////////////////////////////////////////////////////////////
-// Accel Calibration
-///////////////////////////////////////////////////////////////////
-void calibrateAccelerometer() {
-    Serial.println("Calibrating accelerometer... Rotate the device to ensure each face points upward.");
-
-    float aMin[3] = {999, 999, 999}; // Minimum readings for X, Y, Z
-    float aMax[3] = {-999, -999, -999}; // Maximum readings for X, Y, Z
-
-    unsigned long startTime = millis();
-    while (millis() - startTime < 20000) { // Collect data for 20 seconds
-        if (IMU.accelAvailable()) {
-            IMU.readRawAccel(aX, aY, aZ);
-            if (aX < aMin[0]) aMin[0] = aX;
-            if (aX > aMax[0]) aMax[0] = aX;
-            if (aY < aMin[1]) aMin[1] = aY;
-            if (aY > aMax[1]) aMax[1] = aY;
-            if (aZ < aMin[2]) aMin[2] = aZ;
-            if (aZ > aMax[2]) aMax[2] = aZ;
-        }
-        delay(10);
-    }
-
-    calibrationData.accelerometerOffset.axis.x = (aMax[0] + aMin[0]) / 2.0f;
-    calibrationData.accelerometerOffset.axis.y = (aMax[1] + aMin[1]) / 2.0f;
-    calibrationData.accelerometerOffset.axis.z = (aMax[2] + aMin[2]) / 2.0f;
-
-    calibrationData.accelerometerSensitivity.axis.x = 2.0f / (aMax[0] - aMin[0]);
-    calibrationData.accelerometerSensitivity.axis.y = 2.0f / (aMax[1] - aMin[1]);
-    calibrationData.accelerometerSensitivity.axis.z = 2.0f / (aMax[2] - aMin[2]);
-
-    Serial.println("Accelerometer calibration complete.");
-    Serial.print("Offsets: ");
-    Serial.print(calibrationData.accelerometerOffset.axis.x);
-    Serial.print(", ");
-    Serial.print(calibrationData.accelerometerOffset.axis.y);
-    Serial.print(", ");
-    Serial.println(calibrationData.accelerometerOffset.axis.z);
-    Serial.print("Sensitivity: ");
-    Serial.print(calibrationData.accelerometerSensitivity.axis.x);
-    Serial.print(", ");
-    Serial.print(calibrationData.accelerometerSensitivity.axis.y);
-    Serial.print(", ");
-    Serial.println(calibrationData.accelerometerSensitivity.axis.z);
-}
-
-///////////////////////////////////////////////////////////////////
-// Mag Calibration
-///////////////////////////////////////////////////////////////////
-void calibrateMagnetometer() {
-    Serial.println("Calibrating magnetometer... Move the device in a figure-eight pattern.");
-
-    float mMin[3] = {999, 999, 999}; // Minimum readings for X, Y, Z
-    float mMax[3] = {-999, -999, -999}; // Maximum readings for X, Y, Z
-
-    unsigned long startTime = millis();
-    while (millis() - startTime < 20000) { // Collect data for 20 seconds
-        if (IMU.magneticFieldAvailable()) {
-            IMU.readRawMagnet(mX, mY, mZ);
-            if (mX < mMin[0]) mMin[0] = mX;
-            if (mX > mMax[0]) mMax[0] = mX;
-            if (mY < mMin[1]) mMin[1] = mY;
-            if (mY > mMax[1]) mMax[1] = mY;
-            if (mZ < mMin[2]) mMin[2] = mZ;
-            if (mZ > mMax[2]) mMax[2] = mZ;
-        }
-        delay(10);
-    }
-
-    calibrationData.hardIronOffset.axis.x = (mMax[0] + mMin[0]) / 2.0f;
-    calibrationData.hardIronOffset.axis.y = (mMax[1] + mMin[1]) / 2.0f;
-    calibrationData.hardIronOffset.axis.z = (mMax[2] + mMin[2]) / 2.0f;
-
-    float deltaX = (mMax[0] - mMin[0]) / 2.0f;
-    float deltaY = (mMax[1] - mMin[1]) / 2.0f;
-    float deltaZ = (mMax[2] - mMin[2]) / 2.0f;
-
-    calibrationData.softIronMatrix.element.xx = 1.0f / deltaX;
-    calibrationData.softIronMatrix.element.yy = 1.0f / deltaY;
-    calibrationData.softIronMatrix.element.zz = 1.0f / deltaZ;
-
-    Serial.println("Magnetometer calibration complete.");
-    Serial.print("Hard Iron Offset: ");
-    Serial.print(calibrationData.hardIronOffset.axis.x);
-    Serial.print(", ");
-    Serial.print(calibrationData.hardIronOffset.axis.y);
-    Serial.print(", ");
-    Serial.println(calibrationData.hardIronOffset.axis.z);
-    Serial.println("Soft Iron Matrix: ");
-    Serial.print(calibrationData.softIronMatrix.element.xx);
-    Serial.print(", ");
-    Serial.print(calibrationData.softIronMatrix.element.yy);
-    Serial.print(", ");
-    Serial.println(calibrationData.softIronMatrix.element.zz);
-}
-
-///////////////////////////////////////////////////////////////////
-// Run Calibration for Gyro, Accel, and Mag
-///////////////////////////////////////////////////////////////////
-void runCalibrationSequence() {
-    Serial.println("Starting calibration sequence...");
-    //GYRO STAGE BLUE
-    digitalWrite(BLUE, LOW); // Turn on blue LED to indicate calibration
-    digitalWrite(RED, HIGH); // Turn off red LED
-    calibrateGyroscope();
-
-    //ACCEL STAGE GREEN
-    digitalWrite(BLUE, HIGH);//Blue off
-    digitalWrite(GREEN, LOW);//Green on
-    calibrateAccelerometer();
-
-    //MAG STAGE LIGHT BLUE
-    digitalWrite(BLUE, LOW);//Blue ON
-    calibrateMagnetometer();
-    digitalWrite(GREEN, HIGH);//Green off
-    digitalWrite(BLUE, HIGH);  // Turn off blue LED to indicate success
-    Serial.println("Calibration sequence completed.");
-}
-
-///////////////////////////////////////////////////////////////////
 // Sensor Fusion Init and Config
 ///////////////////////////////////////////////////////////////////
 void setupFusion(){
 
-    if (!loadCalibrationData()) {
-        runCalibrationSequence();
-        saveCalibrationData();
+    if (EnableCalibration) {
+        if (!loadCalibrationData()) {
+            runCalibrationSequence();
+            saveCalibrationData();
+        }
+
+        // Apply loaded calibration data
+        gyroscopeMisalignment = calibrationData.gyroscopeMisalignment;
+        gyroscopeSensitivity = calibrationData.gyroscopeSensitivity;
+        gyroscopeOffset = calibrationData.gyroscopeOffset;
+        accelerometerMisalignment = calibrationData.accelerometerMisalignment;
+        accelerometerSensitivity = calibrationData.accelerometerSensitivity;
+        accelerometerOffset = calibrationData.accelerometerOffset;
+        //softIronMatrix = calibrationData.softIronMatrix;
+        //hardIronOffset = calibrationData.hardIronOffset;
     }
 
     FusionOffsetInitialise(&offset, SAMPLE_RATE);
@@ -376,16 +113,6 @@ void setupFusion(){
             .recoveryTriggerPeriod = 5 * SAMPLE_RATE, /* 5 seconds */
     };
     FusionAhrsSetSettings(&ahrs, &settings);
-
-    // Apply loaded calibration data
-    gyroscopeMisalignment = calibrationData.gyroscopeMisalignment;
-    gyroscopeSensitivity = calibrationData.gyroscopeSensitivity;
-    gyroscopeOffset = calibrationData.gyroscopeOffset;
-    accelerometerMisalignment = calibrationData.accelerometerMisalignment;
-    accelerometerSensitivity = calibrationData.accelerometerSensitivity;
-    accelerometerOffset = calibrationData.accelerometerOffset;
-    softIronMatrix = calibrationData.softIronMatrix;
-    hardIronOffset = calibrationData.hardIronOffset;
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -413,8 +140,20 @@ void updateAngles() {
 
     // Apply calibration
     gyroscope = FusionCalibrationInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
+    if (isnan(gyroscope.axis.x) || isnan(gyroscope.axis.y) || isnan(gyroscope.axis.z)) {
+        Serial.println("Error: Gyroscope calibration resulted in NaN!");
+        return; // Skip this update
+    }
     accelerometer = FusionCalibrationInertial(accelerometer, accelerometerMisalignment, accelerometerSensitivity, accelerometerOffset);
+    if (isnan(accelerometer.axis.x) || isnan(accelerometer.axis.y) || isnan(accelerometer.axis.z)) {
+        Serial.println("Error: Accelerometer calibration resulted in NaN!");
+        return; // Skip this update
+    }
     magnetometer = FusionCalibrationMagnetic(magnetometer, softIronMatrix, hardIronOffset);
+    if (isnan(magnetometer.axis.x) || isnan(magnetometer.axis.y) || isnan(magnetometer.axis.z)) {
+        Serial.println("Error: Magnetometer calibration resulted in NaN!");
+        return; // Skip this update
+    }
 
     // Update gyroscope offset correction algorithm
     gyroscope = FusionOffsetUpdate(&offset, gyroscope);
@@ -431,64 +170,123 @@ void updateAngles() {
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
     //const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
 
-    hat.gyro[0] = euler.angle.yaw;
-    hat.gyro[1] = euler.angle.pitch;
-    hat.gyro[2] = euler.angle.roll;
-    sendAnglesToHatire();
-}
+    if (TestMode) {
+        // TestMode CODE
+        static unsigned long lastPrintTime = 0; // Timer for printing
+        const unsigned long printInterval = 500; // Print every N ms
+        unsigned long currentMillis = millis();
+        if (currentMillis - lastPrintTime >= printInterval) {
+            lastPrintTime = currentMillis;
 
-///////////////////////////////////////////////////////////////////
-// Detect shake for erase calibration memory feature
-///////////////////////////////////////////////////////////////////
-bool detectShake() {
-    const float SHAKE_THRESHOLD = 1.5; // Adjust threshold for sensitivity
-    const unsigned long SHAKE_DURATION = 5000; // Shake time in milliseconds
-
-    static unsigned long shakeStartTime = 0;
-    static unsigned long lastShakeTime = 0;
-    static bool isShaking = false;
-
-    // Read accelerometer values
-    if (IMU.accelAvailable()) {
-        IMU.readRawAccel(aX, aY, aZ);
-
-        // Calculate total G-force
-        float totalG = sqrt(aX * aX + aY * aY + aZ * aZ);
-        totalG = abs(totalG); // Absolute value to handle negatives
-
-        if (totalG > SHAKE_THRESHOLD) {
-            lastShakeTime = millis(); // Update the last shake time
-            if (!isShaking) {
-                shakeStartTime = millis(); // Start shake timer
-                isShaking = true;
-                digitalWrite(LED_BUILTIN, HIGH);
-            } else if (millis() - shakeStartTime >= SHAKE_DURATION) {
-                return true; // Shake detected
+            //Print the header only once
+            static bool headerPrinted = false;
+            if (!headerPrinted) {
+                Serial.println("   Pitch      Roll       Yaw");
+                Serial.println("-------------------------------");
+                headerPrinted = true;
             }
-        } else if (millis() - lastShakeTime > 250) { // 250ms buffer to prevent immediate reset
-            isShaking = false;
-            digitalWrite(LED_BUILTIN, LOW);
-        }
-    }
 
-    return false;
+            // Print the Euler angles in columns
+            Serial.print("   ");
+            Serial.print(euler.angle.pitch, 2);
+            Serial.print("    ");
+            Serial.print(euler.angle.roll, 2);
+            Serial.print("    ");
+            Serial.println(euler.angle.yaw, 2);
+
+            /* Raw data
+            Serial.print("Raw Gyro: ");
+            Serial.print(gX);
+            Serial.print(", ");
+            Serial.print(gY);
+            Serial.print(", ");
+            Serial.print(gZ);
+            
+            Serial.print("   Calibrated Gyro: ");
+            Serial.print(gyroscope.axis.x);
+            Serial.print(", ");
+            Serial.print(gyroscope.axis.y);
+            Serial.print(", ");
+            Serial.println(gyroscope.axis.z);
+
+            Serial.print("Raw Accel: ");
+            Serial.print(aX);
+            Serial.print(", ");
+            Serial.print(aY);
+            Serial.print(", ");
+            Serial.print(aZ);
+
+            Serial.print("   Calibrated Accel: ");
+            Serial.print(accelerometer.axis.x);
+            Serial.print(", ");
+            Serial.print(accelerometer.axis.y);
+            Serial.print(", ");
+            Serial.println(accelerometer.axis.z);*/
+        }
+    } else {
+        hat.gyro[0] = euler.angle.yaw;
+        hat.gyro[1] = euler.angle.pitch;
+        hat.gyro[2] = euler.angle.roll;
+        sendAnglesToHatire();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
 // Init IO
 ///////////////////////////////////////////////////////////////////
-void initIO(){
-    
-    Serial.begin(115200);
+void initIO() {
 
-    BLE.begin();
+    Serial.println("Starting BLE initialization...");
+
+    // Initialize BLE
+    if (!BLE.begin()) {
+        Serial.println("[ERROR] BLE initialization failed! Is the BLE hardware functional?");
+        while (1); // Halt execution
+    } else {
+        Serial.println("[INFO] BLE initialization successful.");
+    }
+    delay(100);
+    // Set device local name
     BLE.setLocalName("Nano 33 Head Tracker");
+    Serial.println("[INFO] Set local name to 'Nano 33 Head Tracker'.");
+    delay(100);
+    // Set advertised service
     BLE.setAdvertisedService(opentrackService);
+    Serial.println("[INFO] Advertised service linked to BLE peripheral.");
+    delay(100);
+    // Add characteristic
     opentrackService.addCharacteristic(hatireCharacteristic);
+    Serial.println("[INFO] Added characteristic to the service.");
+    delay(100);
+    // Add service to BLE peripheral
     BLE.addService(opentrackService);
-    BLE.advertise();
+    Serial.println("[INFO] Service added to BLE peripheral.");
+    delay(100);
+    // Initialize characteristic with default data
+    if (!hatireCharacteristic.setValue((byte *)&hat, sizeof(hat))) {
+        Serial.println("[ERROR] Failed to set initial value for characteristic!");
+    } else {
+        Serial.println("[INFO] Initial value set for characteristic.");
+    }
+    delay(100);
 
+    // Start advertising
+    if (!BLE.advertise()) {
+        Serial.println("[ERROR] BLE advertising failed to start!");
+    } else {
+        Serial.println("[INFO] BLE advertising started successfully.");
+    }
+
+    delay(100);
+    if (!TestMode) {
+        Serial.begin(115200);
+    }
+
+    // Indicate IO initialization complete
     digitalWrite(BLUE, LOW);
+    digitalWrite(RED, LOW);
+    IOInitDone = true;
+    Serial.println("[INFO] IO initialization complete.");
 }
 
 // Setup function
@@ -513,9 +311,11 @@ void setup() {
     digitalWrite(BLUE, HIGH);
     digitalWrite(LED_BUILTIN, LOW);
 
-    /*initIO();
-    IOInitDone = true;
-    while (!Serial);*/
+    //Early Init for testing
+    if (TestMode) {
+        Serial.begin(115200);
+        while (!Serial);
+    }
 
     //Init File System
     myFS = new FileSystem_MBED();
@@ -525,12 +325,33 @@ void setup() {
         Serial.println("LSM9DS1 IMU Connected.");
         IMU.setGyroODR(3);
         IMU.setAccelODR(3);
-        IMU.setMagnetODR(3);
+        IMU.setMagnetODR(5);
         IMU.setContinuousMode();
 
+        //IO Init
+        initIO();
+
+        //Wait for serial or BLE conenection here
+        //If calibration enabled, check if the user is shaking the device during this time
+        while (!Serial && !BLE.central() && EnableCalibration){
+            if (detectShake()) {
+                Serial.println("Shake detected! Clearing calibration data...");
+                digitalWrite(BLUE, HIGH);
+                digitalWrite(GREEN, LOW);
+                digitalWrite(RED, LOW);
+                clearCalibrationData();
+                delay(3000); // Add a delay to prevent repeated triggering
+                digitalWrite(GREEN, HIGH);
+                digitalWrite(BLUE, LOW);
+                Serial.println("Restarting device...");
+                delay(100); // Small delay to allow Serial messages to be sent
+                NVIC_SystemReset(); // Restart the microcontroller 
+            }
+            delay(1000);
+        };
+
         setupFusion();
-        digitalWrite(RED, LOW);
-        digitalWrite(LED_PWR, LOW);
+        delay(250);
     } else {
         if (!IMU.begin()){
           Serial.println("Failed to initialize IMU!");
@@ -550,27 +371,6 @@ void setup() {
 // Main loop
 void loop() {
 
-    if (!IOInitDone){
-        initIO();
-        IOInitDone = true;
-    }
-
-    if (detectShake()) {
-        Serial.println("Shake detected! Clearing calibration data...");
-        digitalWrite(BLUE, HIGH);
-        digitalWrite(GREEN, LOW);
-        digitalWrite(RED, LOW);
-        clearCalibrationData();
-        delay(3000); // Add a delay to prevent repeated triggering
-        digitalWrite(GREEN, HIGH);
-        digitalWrite(BLUE, LOW);
-        /*Serial.println("Restarting device...");
-        delay(100); // Small delay to allow Serial messages to be sent
-        NVIC_SystemReset(); // Restart the microcontroller */
-    }
-    
-    delay(1000);
-
     if (Serial || BLE.central()) {
         BLEDevice central = BLE.central();
         if (central.connected()) {
@@ -586,6 +386,13 @@ void loop() {
               }
               loopCounter++;
             }
+            Serial.println("Central device disconnected!");
+            BLEconnected = false;
+            delay(500);
+            BLE.advertise(); // Restart advertising after disconnect
+            digitalWrite(RED, LOW);
+            digitalWrite(BLUE, LOW);
+            digitalWrite(LED_PWR, LOW);
         } else {
             BLEconnected = false;
             BLE.stopAdvertise();
@@ -599,7 +406,8 @@ void loop() {
                 updateAngles();
               }
               loopCounter++;
-              /**if (millis() - previousSecond >= 1000 && TestMode) { // Every second
+              BLE.advertise(); // Restart advertising after disconnect
+              /*if (millis() - previousSecond >= 1000 && TestMode) { // Every second
                 Serial.print("\tLoop Frequency: ");
                 Serial.print(loopCounter);
                 Serial.println(" Hz");
@@ -609,4 +417,5 @@ void loop() {
             }
         }
     }
+    delay(1000);
 }
