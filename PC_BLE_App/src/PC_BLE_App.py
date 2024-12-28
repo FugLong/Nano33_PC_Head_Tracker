@@ -165,7 +165,7 @@ class HeadTrackerApp(QWidget):
         self.ble_worker.status_signal.connect(self.update_status)
 
     def init_ui(self):
-        self.setWindowTitle("Head Tracker UI")
+        self.setWindowTitle("Nano33 Head Tracker - PC BLE")
         self.resize(400, 300)
 
         # Layout and widgets
