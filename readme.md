@@ -1,5 +1,13 @@
 # Arduino Nano 33 PC Head Tracker (WIP)
 
+## UPDATE:
+### Version 2 update is almost ready for release and I'm very excited to show it off. Performance is unbelievable. The core functionality is basically done and in the V2_Update branch, but there are no docs yet. Those are in progress right now.
+
+#### If you're feeling savvy here's a crash course: Pull the V2 branch, build and upload the platform io project to your ardy, and then connect it to your PC with either the hatire opentrack plugin over USB or the UDP opentrack plugin in combination with the PC_BLE_App included in the repo. 
+#### On first connection the device will calibrate. Set it on a flat surface when initiating first connection. Blue light means keep it perfectly still, then green light means rotate it smoothly around all axis. If the device is powered but not connected to serial or bluetooth communication the light will be purple. During this time you can violently shake the device for 5 seconds (you should see the orange light turn on) to clear the calibration data. On next connection it will redo the calibration sequence.
+#### Then you are ready to go. When it first connects leave the device relatively still for about 10 or 15 seconds while the real time filters do their thing then recenter in opentrack. As time goes on performance increases with this algorithm. 
+
+----------------------------------------------------------------------------
 #### Fusion filter by [Aster94](https://github.com/aster94/SensorFusion), modified LSM9DS1 library by [Femme Verbeek]( https://www.linkedin.com/in/femmeverbeek/ ), hatire implementation used for reference by [juanmcasillas](https://github.com/juanmcasillas/HATino)
 #### Extra special thanks to the [opentrack community](https://github.com/opentrack/opentrack) and original hatire plugin creator
 #### Head tracker implementation and hatire/opentrack integration by me, [FugLong]( https://www.linkedin.com/in/elijah-stephenson-38a0a518b/ )
