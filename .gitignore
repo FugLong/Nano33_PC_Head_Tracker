@@ -1,2 +1,3 @@
 .vscode
 build/
+.pio/build/nano33ble/.sconsign311.dblite
