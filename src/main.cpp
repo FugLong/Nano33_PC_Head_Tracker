@@ -106,11 +106,11 @@ void setupFusion(){
     // Set AHRS algorithm settings
     const FusionAhrsSettings settings = {
             .convention = FusionConventionNwu,
-            .gain = 0.55f, //.5 default
+            .gain = 0.75f, //.5 default
             .gyroscopeRange = 2000.0f, /* gyroscope range in degrees/s */
-            .accelerationRejection = 15.0f, //10 default
-            .magneticRejection = 15.0f, //10 default
-            .recoveryTriggerPeriod = 1 * SAMPLE_RATE, /* 5 seconds default */
+            .accelerationRejection = 20.0f, //10 default
+            .magneticRejection = 20.0f, //10 default
+            .recoveryTriggerPeriod = 50, /* 5 seconds default : (50 * SAMPLE_RATE)*/
     };
     FusionAhrsSetSettings(&ahrs, &settings);
 }
