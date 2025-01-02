@@ -67,8 +67,6 @@ class BLEWorker(QThread):
                 yaw, roll, pitch = unpacked_data[2:5]
 
                 x = y = z = 0.0
-                roll = -roll
-                pitch = -pitch
 
                 smoothing_factor = .95
                 if yaw_smooth is None:
