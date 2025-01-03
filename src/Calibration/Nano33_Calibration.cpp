@@ -3,18 +3,11 @@
 #include <FS_Nano33BLE.h>
 #include <float.h>
 #include <Arduino_LSM9DS1.h>
+#include <Utils/Utils.h>
 #include <Fusion/Fusion.h>
 #include <BasicLinearAlgebra.h>
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
-
-// LED Pin definitions
-#define PIN_LED     (13u)
-#define LED_BUILTIN PIN_LED
-#define RED        (22u)
-#define GREEN      (23u)
-#define BLUE       (24u)
-#define LED_PWR    (25u)
 
 // Define calibration (replace with actual calibration data if available)
 FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
@@ -40,10 +33,10 @@ struct CalibrationData {
 CalibrationData calibrationData;
 
 // Sensor variables
-float gX = 0, gY = 0, gZ = 0;
-float aX = 0, aY = 0, aZ = 0;
-float mX = 0, mY = 0, mZ = 0;
-float deltat;
+float CgX = 0, CgY = 0, CgZ = 0;
+float CaX = 0, CaY = 0, CaZ = 0;
+float CmX = 0, CmY = 0, CmZ = 0;
+float Cdeltat;
 
 // FileSystem object
 FileSystem_MBED *myFS;
@@ -57,40 +50,11 @@ String FusionVectorToString(const FusionVector &vector) {
 }
 
 ///////////////////////////////////////////////////////////////////
-// Detect shake for erase calibration memory feature
+// Init filesystem
 ///////////////////////////////////////////////////////////////////
-bool detectShake() {
-    const float SHAKE_THRESHOLD = 1.25; // Adjust threshold for sensitivity
-    const unsigned long SHAKE_DURATION = 5000; // Shake time in milliseconds
-
-    static unsigned long shakeStartTime = 0;
-    static unsigned long lastShakeTime = 0;
-    static bool isShaking = false;
-
-    // Read accelerometer values
-    if (IMU.accelAvailable()) {
-        IMU.readRawAccel(aX, aY, aZ);
-
-        // Calculate total G-force
-        float totalG = sqrt(aX * aX + aY * aY + aZ * aZ);
-        totalG = abs(totalG); // Absolute value to handle negatives
-
-        if (totalG > SHAKE_THRESHOLD) {
-            lastShakeTime = millis(); // Update the last shake time
-            if (!isShaking) {
-                shakeStartTime = millis(); // Start shake timer
-                isShaking = true;
-                digitalWrite(LED_BUILTIN, HIGH);
-            } else if (millis() - shakeStartTime >= SHAKE_DURATION) {
-                return true; // Shake detected
-            }
-        } else if (millis() - lastShakeTime > 1000) { // 500ms buffer to prevent immediate reset
-            isShaking = false;
-            digitalWrite(LED_BUILTIN, LOW);
-        }
-    }
-
-    return false;
+void initFS() {
+    myFS = new FileSystem_MBED();
+    while (!myFS);
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -244,10 +208,10 @@ void calibrateGyroscope() {
 
     for (int i = 0; i < totalSamples; i++) {
         if (IMU.gyroAvailable()) {
-            IMU.readRawGyro(gX, gY, gZ);
-            gXSum += gX;
-            gYSum += gY;
-            gZSum += gZ;
+            IMU.readRawGyro(CgX, CgY, CgZ);
+            gXSum += CgX;
+            gYSum += CgY;
+            gZSum += CgZ;
         }
         delay(10);
     }
@@ -270,14 +234,14 @@ void calibrateAccelerometer() {
 
     for (int i = 0; i < 2000; i++) {
         if (IMU.accelAvailable()) {
-            IMU.readRawAccel(aX, aY, aZ);
+            IMU.readRawAccel(CaX, CaY, CaZ);
 
-            aMin[0] = min(aMin[0], aX);
-            aMax[0] = max(aMax[0], aX);
-            aMin[1] = min(aMin[1], aY);
-            aMax[1] = max(aMax[1], aY);
-            aMin[2] = min(aMin[2], aZ);
-            aMax[2] = max(aMax[2], aZ);
+            aMin[0] = min(aMin[0], CaX);
+            aMax[0] = max(aMax[0], CaX);
+            aMin[1] = min(aMin[1], CaY);
+            aMax[1] = max(aMax[1], CaY);
+            aMin[2] = min(aMin[2], CaZ);
+            aMax[2] = max(aMax[2], CaZ);
         }
         delay(10);
     }
@@ -317,25 +281,25 @@ void calibrateMagnetometer() {
 
     while (true) {
         if (IMU.magneticFieldAvailable()) {
-            IMU.readRawMagnet(mX, mY, mZ);
+            IMU.readRawMagnet(CmX, CmY, CmZ);
 
             // Store data if space is available
             if (collectedSamples < maxSamples) {
-                magData[collectedSamples][0] = mX;
-                magData[collectedSamples][1] = mY;
-                magData[collectedSamples][2] = mZ;
+                magData[collectedSamples][0] = CmX;
+                magData[collectedSamples][1] = CmY;
+                magData[collectedSamples][2] = CmZ;
                 collectedSamples++;
             }
 
             // Update min and max values and check for improvement
             bool improved = false;
             for (int i = 0; i < 3; i++) {
-                if (mX < mMin[i]) {
-                    mMin[i] = mX;
+                if (CmX < mMin[i]) {
+                    mMin[i] = CmX;
                     improved = true;
                 }
-                if (mX > mMax[i]) {
-                    mMax[i] = mX;
+                if (CmX > mMax[i]) {
+                    mMax[i] = CmX;
                     improved = true;
                 }
             }
@@ -435,19 +399,17 @@ void runCalibrationSequence() {
     calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX; // For magnetometer
 
     //GYRO STAGE BLUE
-    digitalWrite(BLUE, LOW); // Turn on blue LED to indicate calibration
-    digitalWrite(RED, HIGH); // Turn off red LED
+    setColorLedState("blue"); // Turn on blue LED to indicate calibration
     calibrateGyroscope();
 
     //ACCEL STAGE GREEN
-    digitalWrite(BLUE, HIGH);//Blue off
-    digitalWrite(GREEN, LOW);//Green on
+    setColorLedState("green");
     calibrateAccelerometer();
 
     /*MAG STAGE LIGHT BLUE
     digitalWrite(BLUE, LOW);//Blue ON
     calibrateMagnetometer();*/
-    digitalWrite(GREEN, HIGH);//Green off
-    digitalWrite(BLUE, HIGH);  // Turn off blue LED to indicate success
+
+    setColorLedState("off");
     Serial.println("Calibration sequence completed.");
 }

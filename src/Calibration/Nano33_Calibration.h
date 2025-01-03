@@ -40,15 +40,10 @@ extern FusionVector accelerometerOffset;
 extern FusionMatrix softIronMatrix;
 extern FusionVector hardIronOffset;
 
-extern float gX, gY, gZ;
-extern float aX, aY, aZ;
-extern float mX, mY, mZ;
-extern float deltat;
-
 extern FileSystem_MBED *myFS;
 
 // Function declarations
-bool detectShake();
+void initFS();
 void clearCalibrationData();
 void saveCalibrationData();
 bool loadCalibrationData();
