@@ -12,7 +12,7 @@
 #define BATTERY_PIN A7
 
 // ENABLE OR DISABLE TEST MODE (dev stuff)
-const bool TestMode = false;
+extern const bool TestMode;
 
 // Battery Function Declarations
 void updateBatteryLEDs(float batteryVoltage);

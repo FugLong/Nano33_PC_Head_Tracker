@@ -1,8 +1,6 @@
 /*
 * IO functions for the Nano 33 BLE
 */
-
-#include <Utils/Utils.h>
 #include "IO.h"
 
 Hat hat = {

@@ -16,6 +16,8 @@ const float ADC_MAX_VOLTAGE = 3.3; // Max voltage for the ADC
 const float LOW_BATTERY_THRESHOLD = 3.2; // Minimum safe battery voltage
 const float MAX_BATTERY_VOLTAGE = 4.2; //Maximum voltage of input battery when fully charged
 
+const bool TestMode = false;
+
 ///////////////////////////////////////////////////////////////////
 // Update LEDs based on battery voltage
 ///////////////////////////////////////////////////////////////////

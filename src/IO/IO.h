@@ -1,6 +1,7 @@
 #ifndef IO_H
 #define IO_H
 
+#include <Utils/Utils.h>
 #include <ArduinoBLE.h>
 #include <Arduino_LSM9DS1.h>
 
