@@ -5,6 +5,11 @@ from struct import unpack, pack
 from bleak import BleakScanner, BleakClient
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QTextEdit, QWidget, QMessageBox
 from PyQt5.QtCore import QThread, pyqtSignal
+import psutil
+import os
+
+p = psutil.Process(os.getpid())
+p.nice(psutil.HIGH_PRIORITY_CLASS)
 
 # BLE Configuration
 DEVICE_NAME = "Nano 33 Head Tracker"
@@ -27,9 +32,6 @@ class BLEWorker(QThread):
         super().__init__()
         self.running = False
         self.stopped = False
-        self.yaw_smooth = None
-        self.pitch_smooth = None
-        self.roll_smooth = None
         self.udp_socket = None
 
     async def discover_device(self):
@@ -44,35 +46,11 @@ class BLEWorker(QThread):
                     self.log_signal.emit(f"Found device: {device.name} ({device.address})")
                     return device.address
             self.log_signal.emit(f"No devices found with name '{DEVICE_NAME}'. Retrying...")
-            if self.stopped:
-                self.log_signal.emit("BLE loop stopped by user before reconnection.")
-                return
-            await asyncio.sleep(1)  # Reduced delay for quicker reconnection
+            await asyncio.sleep(1)
 
     async def handle_ble_notifications(self, client):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         server_address = (UDP_IP, UDP_PORT)
-
-        def wrap_angle(angle):
-            return (angle + 180) % 360 - 180
-
-        def apply_smoothing(current, new, previous_rate=0.0):
-            if current is None:
-                return new
-
-            # Calculate the rate of change
-            rate_of_change = abs(new - current)
-
-            # Determine smoothing factor dynamically based on rate of change
-            if rate_of_change > 30.0:  # Large motion, reduce smoothing
-                factor = 0.7
-            elif rate_of_change > 10.0:  # Moderate motion
-                factor = 0.85
-            else:  # Small motion, increase smoothing
-                factor = 0.95
-
-            # Apply smoothing
-            return wrap_angle(current + factor * wrap_angle(new - current))
 
         async def notification_handler(sender, data):
             try:
@@ -84,11 +62,7 @@ class BLEWorker(QThread):
                 unpacked_data = unpack(HAT_STRUCT_FORMAT, meaningful_data)
                 yaw, roll, pitch = unpacked_data[2:5]
 
-                self.yaw_smooth = apply_smoothing(self.yaw_smooth, yaw)
-                self.pitch_smooth = apply_smoothing(self.pitch_smooth, pitch)
-                self.roll_smooth = apply_smoothing(self.roll_smooth, roll)
-
-                opentrack_data = pack('<6d', 0.0, 0.0, 0.0, self.yaw_smooth, self.pitch_smooth, self.roll_smooth)
+                opentrack_data = pack('<6d', 0.0, 0.0, 0.0, yaw, pitch, roll)
                 self.udp_socket.sendto(opentrack_data, server_address)
             except Exception as e:
                 self.log_signal.emit(f"[ERROR] Notification handler exception: {e}")
@@ -99,7 +73,7 @@ class BLEWorker(QThread):
             self.log_signal.emit("Successfully receiving data...")
 
             while client.is_connected and not self.stopped:
-                await asyncio.sleep(0.5)  # Reduced delay for quicker disconnection detection
+                await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             self.log_signal.emit("[INFO] Notification loop cancelled.")
         except Exception as e:
@@ -108,13 +82,8 @@ class BLEWorker(QThread):
             try:
                 if client.is_connected:
                     await client.stop_notify(CHARACTERISTIC_UUID)
-            except asyncio.CancelledError:
-                self.log_signal.emit("[INFO] BLE notifications cancelled.")
             except Exception as e:
-                if "operation was canceled" in str(e).lower():
-                    self.log_signal.emit("[INFO] BLE notification stop interrupted by user.")
-                else:
-                    self.log_signal.emit(f"[ERROR] Failed to stop notifications cleanly: {e}")
+                self.log_signal.emit(f"[ERROR] Failed to stop notifications cleanly: {e}")
             self.udp_socket.close()
 
     async def ble_loop(self):
@@ -137,14 +106,14 @@ class BLEWorker(QThread):
                     else:
                         self.log_signal.emit("Connection lost.")
             except Exception as e:
-                if not self.stopped:  # Prevent status change after stopping
+                if not self.stopped:
                     self.log_signal.emit(f"[ERROR] BLE connection error: {e}. Retrying...")
                     self.status_signal.emit("searching")
             finally:
-                if not self.stopped:  # Prevent status change after stopping
+                if not self.stopped:
                     self.log_signal.emit("Connection lost or disconnected. Switching to searching state...")
                     self.status_signal.emit("searching")
-                    await asyncio.sleep(1)  # Reduced delay for quicker reconnection
+                    await asyncio.sleep(1)
 
     def run(self):
         self.running = True
