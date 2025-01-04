@@ -8,8 +8,9 @@
 #define BLUE       (24u)
 #define LED_PWR    (25u)
 
-// Define Battery Monitoring Pin
+// Define Battery Monitoring Pin and ADC Res
 #define BATTERY_PIN A7
+#define DEFAULT_ADC_RESOLUTION 10
 
 // ENABLE OR DISABLE TEST MODE (dev stuff)
 extern const bool TestMode;
@@ -21,7 +22,6 @@ bool isBatteryMonitoringAvailable();
 void enterLowPowerMode();
 void checkBattery();
 
-
 // General Function Declarations
 void setupPins();
 bool detectShake();
@@ -30,4 +30,3 @@ void setDataLedState(bool On);
 void setColorLedState(String Color);
 void logString(String input, bool newLine);
 void logString(float input, bool newLine);
-

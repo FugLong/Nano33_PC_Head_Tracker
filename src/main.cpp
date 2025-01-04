@@ -5,16 +5,31 @@
 #include <IO/IO.h>
 
 //ENABLE OR DISABLE CALIBRATION LOADING/SAVING/APPLYING
+//Recommended to leave enabled
 const bool EnableCalibration = true;
 
-// Set AHRS algorithm settings
+// Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.75f, //.5 default
-        .gyroscopeRange = 2000.0f, /* gyroscope range in degrees/s */
-        .accelerationRejection = 20.0f, //10 default
-        .magneticRejection = 20.0f, //10 default
-        .recoveryTriggerPeriod = 50, /* 5 seconds default : (50 * SAMPLE_RATE)*/
+        .gain = 0.75f, //.5 initial default (adds responsiveness at the expense of increased error, good to find a balance)
+        .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s (Don't need to modify in most cases)
+        .accelerationRejection = 12.0f, //10 inital default (this ignores more problematic accel data, helping smooth things out at the expense of latency and potentially accuracy if turned too high))
+        .magneticRejection = 12.0f, //10 initial default (this ignores more problematic mag data, helping smooth things out at the expense of latency and potentially accuracy if turned too high)
+        .recoveryTriggerPeriod = 1000, 
+        /* 5 seconds initial default - 5000
+        * Recommended Range (50-10000 ms) 
+        * 
+        * Set to smaller values right now (1000 ms) to increase fast movement accuracy and speed up error recovery. This is at the expense of stability at non-center angles for longer periods of time. 
+        * Basically this is trying to recenter and correct for error after the device hasn't moved much in this amount of time. 
+        * 
+        * Setting it to 1000 or even lower is best for fast paced fighter pilot type movement, where you aren't holding the same non-center head angle perfectly for more than a few seconds at a time. This gives you near perfect accuracy.
+        * 
+        * If you do look away and stay still for too long the device will start recentering automatically at this new false center.
+        * On the bright side, if this value is low this new false center will get corrected out pretty quick once you look forward again. This can still be annoying for certain playstyles.
+        * 
+        * If you aren't using this for fast paced action and want to be able to have more stability for sightseeing and holding angles for long periods of time, or just want more of a balance,
+        * try increasing this value to as high as you like. 1000 ms is my personal choice
+        */
 };
 
 // Initialise algorithms
@@ -153,6 +168,9 @@ void setup() {
         delay(2000);
     }
 
+    //Battery check to ensure it's not dead on boot
+    checkBattery();
+
     //Init filesystem for calibration data loading and saving
     initFS();
 
@@ -165,22 +183,6 @@ void setup() {
 
         //IO Init
         initIO();
-
-        //Wait for serial or BLE conenection here
-        //If calibration enabled, check if the user is shaking the device during this time
-        while (!Serial && !BLE.central() && EnableCalibration){
-            if (detectShake()) {
-                logString("Shake detected! Clearing calibration data...", true);
-                setColorLedState("orange");
-                clearCalibrationData();
-                delay(3000); // Add a delay to prevent repeated triggering
-                setColorLedState("purple");
-                logString("Restarting device...", true);
-                delay(100); // Small delay to allow Serial messages to be sent
-                NVIC_SystemReset(); // Restart the microcontroller 
-            }
-            delay(1000);
-        };
 
         setupFusion();
         delay(250);
@@ -202,6 +204,22 @@ void setup() {
 
 // Main loop
 void loop() {
+
+    //Wait for serial or BLE conenection here
+    //If calibration enabled, check if the user is shaking the device during this time
+    while (!Serial && !BLE.central() && EnableCalibration){
+        if (detectShake()) {
+            logString("Shake detected! Clearing calibration data...", true);
+            setColorLedState("orange");
+            clearCalibrationData();
+            delay(3000); // Add a delay to prevent repeated triggering
+            setColorLedState("purple");
+            logString("Restarting device...", true);
+            delay(100); // Small delay to allow Serial messages to be sent
+            NVIC_SystemReset(); // Restart the microcontroller 
+        }
+        delay(1000);
+    }
 
     if (Serial || BLE.central()) {
 

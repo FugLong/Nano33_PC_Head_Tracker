@@ -3,6 +3,7 @@
 */
 
 #include <Arduino_LSM9DS1.h>
+#include <ArduinoBLE.h>
 #include "Utils.h"
 
 //-----------------------Battery Utils----------------------------
@@ -16,8 +17,6 @@ const float ADC_MAX_VOLTAGE = 3.3; // Max voltage for the ADC
 const float LOW_BATTERY_THRESHOLD = 3.2; // Minimum safe battery voltage
 const float MAX_BATTERY_VOLTAGE = 4.2; //Maximum voltage of input battery when fully charged
 
-const bool TestMode = false;
-
 ///////////////////////////////////////////////////////////////////
 // Update LEDs based on battery voltage
 ///////////////////////////////////////////////////////////////////
@@ -25,9 +24,9 @@ void updateBatteryLEDs(float batteryVoltage) {
     if (batteryVoltage <= 3.3) {
         // Flash red LED for low battery warning
         for (int i = 0; i < 3; i++) {
-            digitalWrite(RED, LOW);
+            setColorLedState("red");
             delay(250);
-            digitalWrite(RED, HIGH);
+            setColorLedState("off");
             delay(250);
         }
     } else {
@@ -36,19 +35,13 @@ void updateBatteryLEDs(float batteryVoltage) {
 
         if (normalized > 0.66) {
             // Green for high battery level
-            digitalWrite(GREEN, LOW);
-            digitalWrite(BLUE, HIGH);
-            digitalWrite(RED, HIGH);
+            setColorLedState("green");
         } else if (normalized > 0.33) {
-            // Yellow for medium battery level
-            digitalWrite(GREEN, LOW);
-            digitalWrite(BLUE, LOW);
-            digitalWrite(RED, HIGH);
+            // Yellow/orange for medium battery level
+            setColorLedState("orange");
         } else {
             // Red for low battery level
-            digitalWrite(GREEN, HIGH);
-            digitalWrite(BLUE, HIGH);
-            digitalWrite(RED, LOW);
+            setColorLedState("red");
         }
     }
 }
@@ -58,7 +51,9 @@ void updateBatteryLEDs(float batteryVoltage) {
 ///////////////////////////////////////////////////////////////////
 float readBatteryVoltage() {
     int adcValue = analogRead(BATTERY_PIN);
-    float voltageAtPin = (adcValue * ADC_MAX_VOLTAGE) / ((1 << ADC_RESOLUTION) - 1); // Voltage at A7
+    logString("Raw ADC Value: ", false);
+    logString(adcValue, true);
+    float voltageAtPin = (adcValue * ADC_MAX_VOLTAGE) / ((1 << DEFAULT_ADC_RESOLUTION) - 1); // Voltage at A7
     float batteryVoltage = voltageAtPin * ((R1Value + R2Value) / R2Value); // Scale up
 
     return batteryVoltage;
@@ -69,7 +64,7 @@ float readBatteryVoltage() {
 ///////////////////////////////////////////////////////////////////
 bool isBatteryMonitoringAvailable() {
     float voltage = analogRead(BATTERY_PIN) * (ADC_MAX_VOLTAGE / ((1 << ADC_RESOLUTION) - 1));
-    return voltage > 0.1; // A small threshold to detect if voltage is present
+    return voltage > 1; // A small threshold to detect if voltage is present
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -77,12 +72,37 @@ bool isBatteryMonitoringAvailable() {
 ///////////////////////////////////////////////////////////////////
 void enterLowPowerMode() {
     logString("[WARN] Low battery detected! Entering low power mode...", true);
-    digitalWrite(LED_BUILTIN, LOW);
-    digitalWrite(RED, HIGH);
-    digitalWrite(GREEN, HIGH); //LED high Vs low is swapped on the color LEDs only, no clue why
-    digitalWrite(BLUE, HIGH);
-    digitalWrite(LED_PWR, LOW);
-    // Enter the lowest power state available
+
+    // Flash the red light 3 times
+    for (int i = 0; i < 3; i++) {
+        setColorLedState("red");
+        delay(250); // Light on for 250ms
+        setColorLedState("off");
+        delay(250); // Light off for 250ms
+    }
+
+    // Turn off LEDs completely
+    setColorLedState("off");
+    setPowerLedState(false);
+    setDataLedState(false);
+
+    // Disable IMU
+    IMU.end();
+
+    // Disable BLE (ArduinoBLE library specific)
+    if (BLE.connected()) {
+        BLE.disconnect();
+    }
+    BLE.end();
+
+    // Enter system off mode
+    logString("[INFO] Device entering deep sleep...", true);
+    delay(100); // Allow time for logs to be sent
+    NRF_POWER->SYSTEMOFF = 1; // Enter deep sleep (lowest power mode)
+    
+    while (true) {
+        // Stop all execution; the device will wake only on a reset or power cycle.
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -104,6 +124,8 @@ void checkBattery() {
 }
 
 //-----------------------General Utils----------------------------
+
+const bool TestMode = false;
 
 ///////////////////////////////////////////////////////////////////
 // Setup pins for LED control and battery monitoring
@@ -209,7 +231,7 @@ void setColorLedState(String Color) {
 }
 
 ///////////////////////////////////////////////////////////////////
-// Detect shake for erase calibration memory feature
+// Detect shake for battery check and erase calibration memory
 ///////////////////////////////////////////////////////////////////
 bool detectShake() {
     const float SHAKE_THRESHOLD = 1.25; // Adjust threshold for sensitivity
@@ -235,7 +257,10 @@ bool detectShake() {
             if (!isShaking) {
                 shakeStartTime = millis(); // Start shake timer
                 isShaking = true;
-                digitalWrite(LED_BUILTIN, HIGH);
+                setDataLedState(true);
+                if (isBatteryMonitoringAvailable()){
+                    updateBatteryLEDs(readBatteryVoltage());
+                }
             } else if (millis() - shakeStartTime >= SHAKE_DURATION) {
                 return true; // Shake detected
             }

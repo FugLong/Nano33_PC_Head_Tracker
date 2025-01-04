@@ -5,7 +5,7 @@
 cd /d "%~dp0"
 
 :: Run PyInstaller with the spec file
-python -m pyinstaller "./Nano33 Head Tracker - PC BLE.spec"
+pyinstaller "./Nano33 Head Tracker - PC BLE.spec"
 
 :: Pause to view output if there are any errors
 pause

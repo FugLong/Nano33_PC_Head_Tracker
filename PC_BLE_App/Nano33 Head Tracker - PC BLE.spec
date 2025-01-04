@@ -1,12 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['src\\PC_BLE_APP.py'],
-    pathex=[],
-    binaries=[],
+    pathex=['src'],
+    binaries=[
+        ('C:\\Windows\\System32\\BluetoothApis.dll', '.'),
+    ],
     datas=[],
-    hiddenimports=['bleak', 'bleak.backends.winrt', 'PyQt5.QtWidgets', 'PyQt5.QtCore'],
+    hiddenimports=[
+        'bleak',
+        'bleak.backends.winrt',
+        'bleak_winrt',
+        'bleak_winrt.windows',
+        'async_timeout',
+        'winrt',
+        'winrt.windows',
+        'winrt.windows.foundation',
+        'winrt.windows.foundation.collections',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -28,7 +39,7 @@ exe = EXE(
     strip=False,
     upx=True,
     upx_exclude=[],
-    runtime_tmpdir=None,
+    runtime_tmpdir="temp",
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,

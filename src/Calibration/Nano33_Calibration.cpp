@@ -63,11 +63,11 @@ void initFS() {
 void clearCalibrationData() {
     // Check if the file system is initialized
     if (!myFS) {
-        Serial.println("Error: File system is not initialized. Cannot clear calibration data.");
+        logString("Error: File system is not initialized. Cannot clear calibration data.", true);
         return;
     }
 
-    Serial.println("Invalidating calibration data...");
+    logString("Invalidating calibration data...", true);
 
     // Attempt to open the calibration file for reading and writing
     FILE *file = fopen(CALIBRATION_FILE, "r+"); // Open file in read/write mode
@@ -88,12 +88,12 @@ void clearCalibrationData() {
 
         // Verify the write operation
         if (written == 1) {
-            Serial.println("Calibration data invalidated successfully. Reboot to start fresh calibration.");
+            logString("Calibration data invalidated successfully. Reboot to start fresh calibration.", true);
         } else {
-            Serial.println("Error: Failed to update calibration data.");
+            logString("Error: Failed to update calibration data.", true);
         }
     } else {
-        Serial.println("Error: Failed to open calibration file for updating.");
+        logString("Error: Failed to open calibration file for updating.", true);
     }
 }
 
@@ -106,9 +106,9 @@ void saveCalibrationData() {
     if (file) {
         fwrite((uint8_t *)&calibrationData, sizeof(CalibrationData), 1, file);
         fclose(file);
-        Serial.println("Calibration data saved to flash.");
+        logString("Calibration data saved to flash.", true);
     } else {
-        Serial.println("Failed to open file for writing calibration data.");
+        logString("Failed to open file for writing calibration data.", true);
     }
 }
 
@@ -122,55 +122,58 @@ bool loadCalibrationData() {
         fclose(file);
 
         if (calibrationData.valid) {
-            Serial.println("Calibration data loaded from flash:");
+            logString("Calibration data loaded from flash:", true);
 
             // Print Gyroscope Calibration
-            Serial.print("Gyro Offsets: ");
-            Serial.print(calibrationData.gyroscopeOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.gyroscopeOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.gyroscopeOffset.axis.z);
+            logString("Gyro Offsets: ", false);
+            logString(calibrationData.gyroscopeOffset.axis.x, false);
+            logString(", ", false);
+            logString(calibrationData.gyroscopeOffset.axis.y, false);
+            logString(", ", false);
+            logString(calibrationData.gyroscopeOffset.axis.z, true);
 
-            Serial.println("Gyro Misalignment Matrix:");
+            /* Not saved currently, using defaults
+            logString("Gyro Misalignment Matrix:", true);
             for (int row = 0; row < 3; row++) {
                 for (int col = 0; col < 3; col++) {
                     Serial.print(calibrationData.gyroscopeMisalignment.array[row][col], 6);
                     Serial.print(col < 2 ? ", " : "\n");
                 }
-            }
+            } */
 
-            Serial.print("Gyro Sensitivity: ");
-            Serial.print(calibrationData.gyroscopeSensitivity.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.gyroscopeSensitivity.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.gyroscopeSensitivity.axis.z);
+            logString("Gyro Sensitivity: ", false);
+            logString(calibrationData.gyroscopeSensitivity.axis.x, false);
+            logString(", ", false);
+            logString(calibrationData.gyroscopeSensitivity.axis.y, false);
+            logString(", ", false);
+            logString(calibrationData.gyroscopeSensitivity.axis.z, true);
 
             // Print Accelerometer Calibration
-            Serial.print("Accel Offsets: ");
-            Serial.print(calibrationData.accelerometerOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.accelerometerOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.accelerometerOffset.axis.z);
+            logString("Accel Offsets: ", false);
+            logString(calibrationData.accelerometerOffset.axis.x, false);
+            logString(", ", false);
+            logString(calibrationData.accelerometerOffset.axis.y, false);
+            logString(", ", false);
+            logString(calibrationData.accelerometerOffset.axis.z, true);
 
+            /*Not currently saved, using defaults
             Serial.println("Accel Misalignment Matrix:");
             for (int row = 0; row < 3; row++) {
                 for (int col = 0; col < 3; col++) {
                     Serial.print(calibrationData.accelerometerMisalignment.array[row][col], 6);
                     Serial.print(col < 2 ? ", " : "\n");
                 }
-            }
+            } */
 
-            Serial.print("Accel Sensitivity: ");
-            Serial.print(calibrationData.accelerometerSensitivity.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.accelerometerSensitivity.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.accelerometerSensitivity.axis.z);
+            // Print Accelerometer Calibration
+            logString("Accel Sensitivity: ", false);
+            logString(calibrationData.accelerometerSensitivity.axis.x, false);
+            logString(", ", false);
+            logString(calibrationData.accelerometerSensitivity.axis.y, false);
+            logString(", ", false);
+            logString(calibrationData.accelerometerSensitivity.axis.z, true);
 
-            // Print Magnetometer Calibration
+            /* Print Magnetometer Calibration (not currently saved, using defaults)
             Serial.print("Mag Hard Iron Offsets: ");
             Serial.print(calibrationData.hardIronOffset.axis.x);
             Serial.print(", ");
@@ -184,15 +187,15 @@ bool loadCalibrationData() {
                     Serial.print(calibrationData.softIronMatrix.array[row][col], 6);
                     Serial.print(col < 2 ? ", " : "\n");
                 }
-            }
+            } */
 
             return true;
         } else {
-            Serial.println("Calibration data is invalid. Starting calibration sequence.");
+            logString("Calibration data is invalid. Starting calibration sequence.", true);
             return false;
         }
     } else {
-        Serial.println("No calibration data found. Starting calibration sequence.");
+        logString("No calibration data found. Starting calibration sequence.", true);
         return false;
     }
 }
@@ -201,7 +204,7 @@ bool loadCalibrationData() {
 // Gyro Calibration
 ///////////////////////////////////////////////////////////////////
 void calibrateGyroscope() {
-    Serial.println("Calibrating gyroscope... Ensure the device is stationary.");
+    logString("Calibrating gyroscope... Ensure the device is stationary.", true);
 
     float gXSum = 0.0f, gYSum = 0.0f, gZSum = 0.0f;
     const int totalSamples = 500;
@@ -218,16 +221,16 @@ void calibrateGyroscope() {
 
     calibrationData.gyroscopeOffset = { gXSum / totalSamples, gYSum / totalSamples, gZSum / totalSamples };
     calibrationData.gyroscopeSensitivity = { 1.0f, 1.0f, 1.0f }; // Default sensitivity
-    Serial.println("Gyroscope calibration complete.");
-    Serial.print("Offsets: ");
-    Serial.println(FusionVectorToString(calibrationData.gyroscopeOffset));
+    logString("Gyroscope calibration complete.", true);
+    logString("Offsets: ", false);
+    logString(FusionVectorToString(calibrationData.gyroscopeOffset), true);
 }
 
 ///////////////////////////////////////////////////////////////////
 // Accelerometer Calibration
 ///////////////////////////////////////////////////////////////////
 void calibrateAccelerometer() {
-    Serial.println("Calibrating accelerometer... Rotate the device freely.");
+    logString("Calibrating accelerometer... Rotate the device freely.", true);
 
     float aMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
     float aMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
@@ -253,16 +256,16 @@ void calibrateAccelerometer() {
     };
     calibrationData.accelerometerMisalignment = FUSION_IDENTITY_MATRIX; // Default
 
-    Serial.println("Accelerometer calibration complete.");
-    Serial.print("Sensitivity: ");
-    Serial.println(FusionVectorToString(calibrationData.accelerometerSensitivity));
+    logString("Accelerometer calibration complete.", true);
+    logString("Sensitivity: ", false);
+    logString(FusionVectorToString(calibrationData.accelerometerSensitivity), true);
 }
 
 ///////////////////////////////////////////////////////////////////
 // Magnetometer Calibration
 ///////////////////////////////////////////////////////////////////
 void calibrateMagnetometer() {
-    Serial.println("Calibrating magnetometer... Move the device in a figure-eight pattern.");
+    logString("Calibrating magnetometer... Move the device in a figure-eight pattern.", true);
 
     const int maxSamples = 1000;       // Maximum samples to collect
     const int minSamples = 50;         // Minimum samples before checking range
@@ -307,25 +310,25 @@ void calibrateMagnetometer() {
             // Check for improvement
             if (improved) {
                 lastImprovementTime = millis();
-                Serial.print("Improved range detected. Current range (X, Y, Z): ");
-                Serial.print(mMax[0] - mMin[0]);
-                Serial.print(", ");
-                Serial.print(mMax[1] - mMin[1]);
-                Serial.print(", ");
-                Serial.println(mMax[2] - mMin[2]);
+                logString("Improved range detected. Current range (X, Y, Z): ", false);
+                logString(mMax[0] - mMin[0], false);
+                logString(", ", false);
+                logString(mMax[1] - mMin[1], false);
+                logString(", ", false);
+                logString(mMax[2] - mMin[2], true);
             }
 
             // Feedback at intervals
             if (collectedSamples % 50 == 0) {
-                Serial.print("Samples collected: ");
-                Serial.println(collectedSamples);
-                Serial.print("Current range (X, Y, Z): ");
-                Serial.print(mMax[0] - mMin[0]);
-                Serial.print(", ");
-                Serial.print(mMax[1] - mMin[1]);
-                Serial.print(", ");
-                Serial.println(mMax[2] - mMin[2]);
-                Serial.println("Keep moving the device in a figure-eight pattern.");
+                logString("Samples collected: ", false);
+                logString(collectedSamples, true);
+                logString("Current range (X, Y, Z): ", false);
+                logString(mMax[0] - mMin[0], false);
+                logString(", ", false);
+                logString(mMax[1] - mMin[1], false);
+                logString(", ", false);
+                logString(mMax[2] - mMin[2], true);
+                logString("Keep moving the device in a figure-eight pattern.", true);
             }
         }
 
@@ -334,19 +337,19 @@ void calibrateMagnetometer() {
             (mMax[0] - mMin[0] > minRangeThreshold) &&
             (mMax[1] - mMin[1] > minRangeThreshold) &&
             (mMax[2] - mMin[2] > minRangeThreshold)) {
-            Serial.println("Sufficient range detected. Finalizing calibration...");
+            logString("Sufficient range detected. Finalizing calibration...", true);
             break;
         }
 
         // Stop if no improvement is seen for a while
         if (millis() - lastImprovementTime > noImprovementThreshold && collectedSamples >= minSamples) {
-            Serial.println("No significant improvement detected. Finalizing calibration...");
+            logString("No significant improvement detected. Finalizing calibration...", true);
             break;
         }
 
         // End if maximum samples are collected
         if (collectedSamples >= maxSamples) {
-            Serial.println("Maximum samples reached. Finalizing calibration...");
+            logString("Maximum samples reached. Finalizing calibration...", true);
             break;
         }
 
@@ -366,7 +369,7 @@ void calibrateMagnetometer() {
     float deltaZ = (mMax[2] - mMin[2]) / 2.0f;
 
     if (deltaX < minRangeThreshold || deltaY < minRangeThreshold || deltaZ < minRangeThreshold) {
-        Serial.println("Warning: Insufficient range detected. Using identity matrix for soft iron calibration.");
+        logString("Warning: Insufficient range detected. Using identity matrix for soft iron calibration.", true);
         calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX;
     } else {
         calibrationData.softIronMatrix = {
@@ -376,24 +379,24 @@ void calibrateMagnetometer() {
         };
     }
 
-    // Debugging output
-    Serial.println("Magnetometer calibration complete.");
-    Serial.print("Hard Iron Offset: ");
-    Serial.println(FusionVectorToString(calibrationData.hardIronOffset));
-    Serial.println("Soft Iron Matrix: ");
-    Serial.print("XX: ");
+    /* Debugging output
+    logString("Magnetometer calibration complete.", true);
+    logString("Hard Iron Offset: ", false);
+    logString(FusionVectorToString(calibrationData.hardIronOffset), true);
+    logString("Soft Iron Matrix: ", true);
+    logString("XX: ", false);
     Serial.print(calibrationData.softIronMatrix.element.xx, 6);
     Serial.print(", YY: ");
     Serial.print(calibrationData.softIronMatrix.element.yy, 6);
     Serial.print(", ZZ: ");
-    Serial.println(calibrationData.softIronMatrix.element.zz, 6);
+    Serial.println(calibrationData.softIronMatrix.element.zz, 6);*/
 }
 
 ///////////////////////////////////////////////////////////////////
 // Run Calibration for Gyro, Accel, and Mag
 ///////////////////////////////////////////////////////////////////
 void runCalibrationSequence() {
-    Serial.println("Starting calibration sequence...");
+    logString("Starting calibration sequence...", true);
     calibrationData.gyroscopeMisalignment = FUSION_IDENTITY_MATRIX;
     calibrationData.accelerometerMisalignment = FUSION_IDENTITY_MATRIX;
     calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX; // For magnetometer
@@ -411,5 +414,5 @@ void runCalibrationSequence() {
     calibrateMagnetometer();*/
 
     setColorLedState("off");
-    Serial.println("Calibration sequence completed.");
+    logString("Calibration sequence completed.", true);
 }

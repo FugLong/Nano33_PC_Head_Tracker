@@ -3,6 +3,12 @@
 */
 #include "IO.h"
 
+//Change this and the name in the PC app to use a custom name.
+//The only real use for this is if you have more than one tracker running at the same time.
+const char* DeviceName = "Nano 33 Head Tracker";
+
+//-----------------------------------------------------------------
+
 Hat hat = {
     .Begin = (int16_t)0xAAAA, // Explicit cast to int16_t
     .Cpt = 0,
@@ -20,7 +26,6 @@ BLECharacteristic hatireCharacteristic(
     BLERead | BLEWrite | BLENotify,
     sizeof(hat)
 );
-
 ///////////////////////////////////////////////////////////////////
 // Sends HAT structure to Hatire using current communication method
 ///////////////////////////////////////////////////////////////////
@@ -58,7 +63,7 @@ void initIO() {
     }
     delay(100);
     // Set device local name
-    BLE.setLocalName("Nano 33 Head Tracker");
+    BLE.setLocalName(DeviceName);
     logString("[INFO] Set local name to 'Nano 33 Head Tracker'.", true);
     delay(100);
     // Set advertised service
