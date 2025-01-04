@@ -64,7 +64,7 @@ float readBatteryVoltage() {
 ///////////////////////////////////////////////////////////////////
 bool isBatteryMonitoringAvailable() {
     float voltage = analogRead(BATTERY_PIN) * (ADC_MAX_VOLTAGE / ((1 << ADC_RESOLUTION) - 1));
-    return voltage > 1; // A small threshold to detect if voltage is present
+    return voltage > 0.5; // A small threshold to detect if voltage is present
 }
 
 ///////////////////////////////////////////////////////////////////
