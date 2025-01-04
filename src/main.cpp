@@ -148,9 +148,9 @@ void updateAngles() {
             logString(euler.angle.yaw, true);
         }
     } else {
-        hat.gyro[0] = euler.angle.yaw;
+        hat.gyro[0] = -euler.angle.yaw;
         hat.gyro[1] = -euler.angle.pitch;
-        hat.gyro[2] = -euler.angle.roll;
+        hat.gyro[2] = euler.angle.roll;
         sendAnglesToHatire();
     }
 }
