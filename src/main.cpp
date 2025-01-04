@@ -228,9 +228,9 @@ void loop() {
             BLEconnected = true;
         } else {
             BLEconnected = false;
-            BLE.stopAdvertise();
         }
 
+        BLE.stopAdvertise();
         setColorLedState("off");
         setPowerLedState(true);
 

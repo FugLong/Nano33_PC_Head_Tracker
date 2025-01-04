@@ -62,6 +62,7 @@ void initIO() {
         logString("[INFO] BLE initialization successful.", true);
     }
     delay(100);
+
     // Set device local name
     BLE.setLocalName(DeviceName);
     logString("[INFO] Set local name to 'Nano 33 Head Tracker'.", true);
@@ -92,6 +93,8 @@ void initIO() {
     } else {
         logString("[INFO] BLE advertising started successfully.", true);
     }
+    
+    BLE.setConnectionInterval(8, 12); // Min and max set to 8 units (10 ms)
 
     delay(100);
     if (!TestMode) {
