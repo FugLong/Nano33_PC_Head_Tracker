@@ -11,11 +11,11 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.45f, //0.5 initial default
+        .gain = 0.5f, //0.5 initial default
         .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
         .accelerationRejection = 10.0f, //10 inital default 
         .magneticRejection = 10.0f, //10 initial default
-        .recoveryTriggerPeriod = 1000, // 5 seconds initial default - 5000
+        .recoveryTriggerPeriod = 5000, // 5 seconds initial default - 5000
 };
 
 // Initialise algorithms
@@ -35,7 +35,7 @@ unsigned long previousMicros = 0;
 unsigned long previousSecond = 0;
 
 // IMU Sample Rate for Fusion AHRS
-#define SAMPLE_RATE (100)
+#define SAMPLE_RATE (200)
 
 ///////////////////////////////////////////////////////////////////
 // Sensor Fusion Init and Config
@@ -164,9 +164,11 @@ void setup() {
 
     if (IMU.begin() && myFS->init()) {
         logString("LSM9DS1 IMU Connected.", true);
-        IMU.setGyroODR(3);
-        IMU.setAccelODR(3);
-        IMU.setMagnetODR(5);
+        delay(100);
+        IMU.setGyroODR(4);
+        IMU.setAccelODR(4);
+        IMU.setMagnetODR(6);
+        delay(100);
         IMU.setContinuousMode();
 
         //IO Init
