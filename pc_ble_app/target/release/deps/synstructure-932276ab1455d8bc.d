@@ -1,0 +1,8 @@
+C:\Users\elija\Documents\HeadTrackerGit\Nano33_PC_Head_Tracker\pc_ble_app\target\release\deps\libsynstructure-932276ab1455d8bc.rmeta: C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\lib.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\macros.rs
+
+C:\Users\elija\Documents\HeadTrackerGit\Nano33_PC_Head_Tracker\pc_ble_app\target\release\deps\libsynstructure-932276ab1455d8bc.rlib: C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\lib.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\macros.rs
+
+C:\Users\elija\Documents\HeadTrackerGit\Nano33_PC_Head_Tracker\pc_ble_app\target\release\deps\synstructure-932276ab1455d8bc.d: C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\lib.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\macros.rs
+
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\lib.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\synstructure-0.13.1\src\macros.rs:

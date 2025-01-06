@@ -1,0 +1,12 @@
+C:\Users\elija\Documents\HeadTrackerGit\Nano33_PC_Head_Tracker\pc_ble_app\target\debug\deps\libuuid-d6d8c89340d04ac3.rmeta: C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src/lib.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\builder.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\error.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\parser.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\fmt.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\timestamp.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\external.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\macros.rs
+
+C:\Users\elija\Documents\HeadTrackerGit\Nano33_PC_Head_Tracker\pc_ble_app\target\debug\deps\uuid-d6d8c89340d04ac3.d: C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src/lib.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\builder.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\error.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\parser.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\fmt.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\timestamp.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\external.rs C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\macros.rs
+
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src/lib.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\builder.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\error.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\parser.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\fmt.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\timestamp.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\external.rs:
+C:\Users\elija\.cargo\registry\src\index.crates.io-6f17d22bba15001f\uuid-1.11.0\src\macros.rs:
