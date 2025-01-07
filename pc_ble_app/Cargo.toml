@@ -16,6 +16,7 @@ btleplug = "0.9.0"
 bytemuck = "1.15"
 uuid = "0.8.2"
 futures = "0.3"
+serialport = "4.0"
 
 # Asynchronous runtime
 tokio = { version = "1.32", features = ["full"] }

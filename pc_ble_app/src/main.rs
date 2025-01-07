@@ -277,29 +277,72 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let status = self.app_state.status.lock().unwrap().clone();
-            let button_label = match status.as_str() {
-                "Off" => "Start",
-                _ => "Stop",
-            };
-
+            // Horizontal layout for the buttons and indicators
             ui.horizontal(|ui| {
-                ui.add_sized([150.0, 40.0], egui::Button::new(button_label)).clicked().then(|| {
-                    let new_status = if status == "Off" {
-                        self.app_state.set_should_run(true);
-                        self.app_state.log_message("Starting head tracking...");
-                        "Scanning..."
-                    } else {
-                        self.app_state.set_should_run(false);
-                        self.app_state.log_message("Stopping head tracking...");
-                        "Off"
-                    };
-                    self.app_state.update_status(new_status);
+                // Fake LED indicator
+                let is_usb = is_usb_connection();
+                let is_ble = is_ble_connection(&self.app_state);
+                let led_color = if is_usb || is_ble { egui::Color32::GREEN } else { egui::Color32::RED };
+                ui.add(egui::Label::new(egui::RichText::new(" ").background_color(led_color).size(28.0)));
+                ui.vertical(|ui| {
+                    let connection_text = if is_usb || is_ble { "Connected" } else { "Disconnected" };
+                    ui.label(egui::RichText::new(connection_text));
+                    ui.horizontal(|ui| {
+                        let usb_color = if is_usb {
+                            egui::Color32::GREEN
+                        } else {
+                            egui::Color32::GRAY
+                        };
+
+                        let ble_color = if is_ble {
+                            egui::Color32::from_rgb(135, 206, 250) // Softer, lighter blue
+                        } else {
+                            egui::Color32::GRAY
+                        };
+
+                        ui.label(egui::RichText::new("USB").color(usb_color).size(10.0)); // Adjusted font size
+                        ui.add_space(2.0); // Reduced space between USB and BLE
+                        ui.label(egui::RichText::new("BLE").color(ble_color).size(10.0));
+                    });
                 });
+
+                // Start/Stop BLE Button
+                let status = self.app_state.status.lock().unwrap().clone();
+                let button_label = if status == "Off" { "Start BLE" } else { "Stop BLE" };
+                if !is_usb {
+                    if ui.add_sized([120.0, 30.0], egui::Button::new(button_label)).clicked() { // Slightly reduced height
+                        let new_status = if status == "Off" {
+                            self.app_state.set_should_run(true);
+                            self.app_state.log_message("Starting head tracking...");
+                            "Scanning..."
+                        } else {
+                            self.app_state.set_should_run(false);
+                            self.app_state.log_message("Stopping head tracking...");
+                            "Off"
+                        };
+                        self.app_state.update_status(new_status);
+                    }
+                } else {
+                    if status != "Off" {
+                        self.app_state.set_should_run(false);
+                        self.app_state.log_message("Stopping BLE loop due to USB connection...");
+                        self.app_state.update_status("Off");
+                    }
+                    ui.add_sized([120.0, 30.0], egui::Button::new(button_label).sense(egui::Sense::hover()));
+                }
+
+                // Flash Arduino Button
+                if !is_usb {
+                    ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino").sense(egui::Sense::hover()));
+                } else if ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino")).clicked() {
+                    self.app_state.log_message("Flashing Arduino...");
+                    flash_arduino();
+                }
             });
 
             ui.separator();
 
+            // Log Section
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
                 .stick_to_bottom(true) // Automatically stick to the bottom when new logs are added
@@ -311,7 +354,50 @@ impl eframe::App for MyApp {
                     }
                 });
         });
+
         ctx.request_repaint();
+    }
+}
+
+fn is_usb_connection() -> bool {
+    use serialport::{available_ports, SerialPortType};
+    if let Ok(ports) = available_ports() {
+        for port in ports {
+            if let SerialPortType::UsbPort(_) = port.port_type {
+                // Check specific product/vendor IDs if necessary
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn is_ble_connection(app_state: &AppState) -> bool {
+    let status = app_state.status.lock().unwrap().clone();
+    status == "Connected"
+}
+
+fn flash_arduino() {
+    use std::process::Command;
+
+    // Example command to run PlatformIO CLI for flashing
+    let output = Command::new("pio")
+        .arg("run")
+        .arg("--target")
+        .arg("upload")
+        .output();
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                println!("Arduino flashed successfully");
+            } else {
+                eprintln!("Failed to flash Arduino: {:?}", output.stderr);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error running PlatformIO CLI: {}", e);
+        }
     }
 }
 
