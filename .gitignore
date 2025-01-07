@@ -1,5 +1,5 @@
 .vscode
 build/
 temp/
-.pio/build/
+.pio/
 pc_ble_app/target/

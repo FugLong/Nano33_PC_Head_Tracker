@@ -5,8 +5,15 @@ use std::thread;
 use std::time::Duration;
 use btleplug::api::{Central, Manager as _, Peripheral, ScanFilter};
 use btleplug::platform::Manager;
+use std::os::windows::process::CommandExt;
 use bytemuck::{Pod, Zeroable};
 use eframe::egui;
+use std::fs;
+use zip::ZipArchive;
+use std::io::Cursor;
+use std::path::{PathBuf, Path};
+use std::process::Command;
+use std::io::BufRead;
 use tokio::runtime::Runtime;
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -336,23 +343,34 @@ impl eframe::App for MyApp {
                     ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino").sense(egui::Sense::hover()));
                 } else if ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino")).clicked() {
                     self.app_state.log_message("Flashing Arduino...");
-                    flash_arduino();
+                    let log_clone = self.app_state.log.clone();
+                    flash_arduino(log_clone);
                 }
             });
 
             ui.separator();
 
-            // Log Section
+            ui.label("Log Output:");
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
-                .stick_to_bottom(true) // Automatically stick to the bottom when new logs are added
+                .stick_to_bottom(true) // Automatically scroll to the bottom when new logs are added
                 .show(ui, |ui| {
                     let log = self.app_state.log.lock().unwrap();
-
-                    for entry in log.iter() {
-                        ui.label(entry);
-                    }
-                });
+                    let log_text = log.join("\n");
+            
+                    let colored_text = egui::RichText::new(log_text.clone())
+                        .monospace()
+                        .color(egui::Color32::from_gray(200)); // Adjust the brightness (0-255)
+            
+                    ui.add(
+                        egui::TextEdit::multiline(&mut colored_text.text().to_owned())
+                            .font(egui::TextStyle::Monospace) // Use a monospace font
+                            .code_editor()                   // Enables text selection and copy-paste
+                            .frame(false)                    // Removes the frame for a cleaner look
+                            .desired_width(f32::INFINITY)    // Expands to full width
+                            .desired_rows(10),               // Sets the number of visible rows
+                    );
+                });            
         });
 
         ctx.request_repaint();
@@ -377,28 +395,381 @@ fn is_ble_connection(app_state: &AppState) -> bool {
     status == "Connected"
 }
 
-fn flash_arduino() {
-    use std::process::Command;
+fn check_existing_python() -> Option<PathBuf> {
+    let python_dir = get_app_directory().join("python");
+    let python_exe = python_dir.join("python.exe");
+    if python_exe.exists() && python_dir.join("Lib").exists() {
+        Some(python_exe)
+    } else {
+        None
+    }
+}
 
-    // Example command to run PlatformIO CLI for flashing
-    let output = Command::new("pio")
-        .arg("run")
-        .arg("--target")
-        .arg("upload")
-        .output();
+fn check_existing_pip(python_exe: &Path) -> bool {
+    let output = Command::new(python_exe)
+        .arg("-m")
+        .arg("pip")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    output.map_or(false, |status| status.success())
+}
 
-    match output {
-        Ok(output) => {
-            if output.status.success() {
-                println!("Arduino flashed successfully");
-            } else {
-                eprintln!("Failed to flash Arduino: {:?}", output.stderr);
+fn check_existing_platformio(python_exe: &Path) -> bool {
+    let output = Command::new(python_exe)
+        .arg("-m")
+        .arg("pip")
+        .arg("show")
+        .arg("platformio")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    output.map_or(false, |status| status.success())
+}
+
+fn download_and_setup_python() -> Result<PathBuf, String> {
+    let python_dir = get_app_directory().join("python");
+    let python_exe = python_dir.join("python.exe");
+
+    // If Python is already set up, return early
+    if python_exe.exists() && python_dir.join("Lib").exists() {
+        return Ok(python_exe);
+    }
+
+    // Clean up any partial installation
+    if python_dir.exists() {
+        fs::remove_dir_all(&python_dir).map_err(|e| format!("Failed to clean up Python directory: {}", e))?;
+    }
+
+    // Create fresh Python directory
+    fs::create_dir_all(&python_dir).map_err(|e| format!("Failed to create Python directory: {}", e))?;
+
+    // Download and extract main Python distribution
+    let python_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-embed-amd64.zip";
+    println!("Downloading Python from {}", python_url);
+    let response = reqwest::blocking::get(python_url).map_err(|e| format!("Failed to download Python: {}", e))?;
+    let mut archive = ZipArchive::new(Cursor::new(response.bytes().map_err(|e| e.to_string())?))
+        .map_err(|e| format!("Failed to parse Python ZIP archive: {}", e))?;
+
+    // Extract main Python distribution
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| format!("Failed to extract file from ZIP: {}", e))?;
+        let out_path = python_dir.join(file.mangled_name());
+
+        if file.is_dir() {
+            fs::create_dir_all(&out_path).map_err(|e| format!("Failed to create directory: {}", e))?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {}", e))?;
             }
-        }
-        Err(e) => {
-            eprintln!("Error running PlatformIO CLI: {}", e);
+            let mut outfile = fs::File::create(&out_path).map_err(|e| format!("Failed to create file: {}", e))?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| format!("Failed to write file: {}", e))?;
         }
     }
+
+    // Download and extract standard library
+    let stdlib_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe";
+    println!("Downloading Python standard library...");
+    let response = reqwest::blocking::get(stdlib_url).map_err(|e| format!("Failed to download stdlib: {}", e))?;
+    
+    // Save the exe temporarily
+    let temp_exe = python_dir.join("python_installer.exe");
+    fs::write(&temp_exe, response.bytes().map_err(|e| e.to_string())?)
+        .map_err(|e| format!("Failed to save installer: {}", e))?;
+
+    // Extract the exe (it's actually a self-extracting archive)
+    let output = Command::new(&temp_exe)
+        .args(["/quiet", "/layout", python_dir.to_str().unwrap()])
+        .creation_flags(0x08000000)  // CREATE_NO_WINDOW
+        .output()
+        .map_err(|e| format!("Failed to extract stdlib: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("Failed to extract stdlib: {:?}", output));
+    }
+
+    // Clean up installer
+    let _ = fs::remove_file(temp_exe);
+
+    // Create/modify python3XX._pth file
+    let pth_file_path = python_dir.join("python311._pth");
+    let pth_contents = "python311.zip\n.\nLib/site-packages\nimport site";
+    fs::write(&pth_file_path, pth_contents).map_err(|e| format!("Failed to write _pth file: {}", e))?;
+
+    // Create empty Lib/site-packages directory if it doesn't exist
+    fs::create_dir_all(python_dir.join("Lib").join("site-packages"))
+        .map_err(|e| format!("Failed to create site-packages directory: {}", e))?;
+
+    Ok(python_exe)
+}
+
+fn bootstrap_pip(python_exe: &Path, log: Arc<Mutex<Vec<String>>>) -> Result<(), String> {
+    let get_pip_url = "https://bootstrap.pypa.io/get-pip.py";
+    let get_pip_script = python_exe.parent().unwrap().join("get-pip.py");
+
+    log.lock().unwrap().push("Bootstrapping pip...".to_string());
+
+    // Download get-pip.py
+    log.lock().unwrap().push("Downloading get-pip.py...".to_string());
+    let response = reqwest::blocking::get(get_pip_url)
+        .map_err(|e| format!("Failed to download get-pip.py: {}", e))?;
+    
+    fs::write(&get_pip_script, response.bytes().map_err(|e| e.to_string())?)
+        .map_err(|e| format!("Failed to write get-pip.py: {}", e))?;
+
+    // Run get-pip.py
+    log.lock().unwrap().push("Executing get-pip.py...".to_string());
+    let output = Command::new(python_exe)
+        .arg(&get_pip_script)
+        .arg("--no-warn-script-location")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("Failed to execute get-pip.py: {:?}", e))?;
+
+    // Clean up get-pip.py regardless of success
+    let _ = fs::remove_file(&get_pip_script);
+
+    if output.status.success() {
+        log.lock().unwrap().push("Pip bootstrapped successfully.".to_string());
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log.lock().unwrap().push(format!("Failed to bootstrap pip:\n{}", stderr));
+        Err("Failed to bootstrap pip.".to_string())
+    }
+}
+
+fn install_platformio(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
+    let python_exe = download_and_setup_python()?;
+
+    if check_existing_platformio(&python_exe) {
+        log.lock().unwrap().push("PlatformIO is already installed.".to_string());
+        return Ok(python_exe);
+    }
+
+    log.lock().unwrap().push("Installing PlatformIO...".to_string());
+
+    let output = Command::new(&python_exe)
+        .arg("-m")
+        .arg("pip")
+        .arg("install")
+        .arg("platformio")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .map_err(|e| format!("Failed to execute pip: {:?}", e))?;
+
+    if output.status.success() {
+        log.lock().unwrap().push("PlatformIO installed successfully.".to_string());
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log.lock().unwrap().push(format!("PlatformIO installation failed:\n{}", stderr));
+        return Err("Failed to install PlatformIO".to_string());
+    }
+
+    Ok(python_exe)
+}
+
+fn find_project_dir(base_dir: &Path) -> Option<PathBuf> {
+    if let Ok(entries) = fs::read_dir(base_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = path.file_name()?.to_string_lossy();
+                    if name.starts_with("Nano33") && path.join("platformio.ini").exists() {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn prepare_platformio_project(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
+    let base_project_dir = get_project_directory();
+    
+    // Check if project already exists
+    if let Some(existing_dir) = find_project_dir(&base_project_dir) {
+        log.lock().unwrap().push("PlatformIO project already exists. Skipping download.".to_string());
+        return Ok(existing_dir);
+    }
+
+    log.lock().unwrap().push("Downloading PlatformIO project...".to_string());
+
+    // Clean up any existing partial project
+    if base_project_dir.exists() {
+        fs::remove_dir_all(&base_project_dir).map_err(|e| format!("Failed to clean up project directory: {}", e))?;
+    }
+
+    fs::create_dir_all(&base_project_dir).map_err(|e| format!("Failed to create project directory: {}", e))?;
+
+    let repo_url = "https://github.com/FugLong/Nano33_PC_Head_Tracker/archive/refs/heads/V2_Update.zip";
+    log.lock().unwrap().push(format!("Downloading from: {}", repo_url));
+    
+    let response = reqwest::blocking::get(repo_url).map_err(|e| format!("Failed to download project: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Failed to download project: HTTP {}", response.status()));
+    }
+
+    let bytes = response.bytes().map_err(|e| format!("Failed to get response bytes: {}", e))?;
+    log.lock().unwrap().push(format!("Downloaded {} bytes", bytes.len()));
+
+    let mut archive = ZipArchive::new(Cursor::new(bytes))
+        .map_err(|e| format!("Failed to parse ZIP archive: {}", e))?;
+
+    log.lock().unwrap().push(format!("ZIP archive contains {} files", archive.len()));
+
+    // Extract files
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| format!("Failed to extract file from ZIP: {}", e))?;
+        
+        let file_name = file.name().to_string(); // Immutable borrow ends here
+        let out_path = base_project_dir.join(&file_name);
+        
+        //log.lock().unwrap().push(format!("Extracting: {}", file_name));
+
+        if file.is_dir() {
+            fs::create_dir_all(&out_path).map_err(|e| format!("Failed to create directory {}: {}", file_name, e))?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent directory for {}: {}", file_name, e))?;
+            }
+            let mut outfile = fs::File::create(&out_path)
+                .map_err(|e| format!("Failed to create file {}: {}", file_name, e))?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("Failed to write file {}: {}", file_name, e))?;
+        }
+    }
+
+    // Verify the extraction using `find_project_dir`
+    if let Some(project_dir) = find_project_dir(&base_project_dir) {
+        log.lock().unwrap().push(format!("Project directory verified successfully: {:?}", project_dir));
+        Ok(project_dir)
+    } else {
+        // Debugging: List contents of the base directory
+        log.lock().unwrap().push("Failed to find project directory after extraction. Contents:".to_string());
+        if let Ok(entries) = fs::read_dir(&base_project_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    log.lock().unwrap().push(format!("  {:?}", entry.path()));
+                }
+            }
+        }
+        Err("Failed to find valid project directory after extraction.".to_string())
+    }
+}
+
+fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
+    let log_clone = log.clone();
+
+    thread::spawn(move || {
+        log_clone.lock().unwrap().push("Starting Arduino flashing process...".to_string());
+
+        let python_exe = match check_existing_python() {
+            Some(python) => {
+                log_clone.lock().unwrap().push("Python already installed.".to_string());
+                python
+            },
+            None => match download_and_setup_python() {
+                Ok(python) => {
+                    log_clone.lock().unwrap().push("Python installed successfully.".to_string());
+                    python
+                },
+                Err(e) => {
+                    log_clone.lock().unwrap().push(format!("Error setting up Python: {}", e));
+                    return;
+                }
+            },
+        };
+
+        if !check_existing_pip(&python_exe) {
+            if let Err(e) = bootstrap_pip(&python_exe, log_clone.clone()) {
+                log_clone.lock().unwrap().push(format!("Error setting up pip: {}", e));
+                return;
+            } else {
+                log_clone.lock().unwrap().push("Pip installed successfully.".to_string());
+            }
+        } else {
+            log_clone.lock().unwrap().push("Pip already installed.".to_string());
+        }
+
+        if !check_existing_platformio(&python_exe) {
+            if let Err(e) = install_platformio(log_clone.clone()) {
+                log_clone.lock().unwrap().push(format!("Error installing PlatformIO: {}", e));
+                return;
+            } else {
+                log_clone.lock().unwrap().push("PlatformIO installed successfully.".to_string());
+            }
+        } else {
+            log_clone.lock().unwrap().push("PlatformIO already installed.".to_string());
+        }
+
+        match prepare_platformio_project(log_clone.clone()) {
+            Ok(project_dir) => {
+                log_clone.lock().unwrap().push("Flashing Arduino...".to_string());
+
+                let output = Command::new(&python_exe)
+                    .current_dir(&project_dir)
+                    .arg("-m")
+                    .arg("platformio")
+                    .arg("run")
+                    .arg("--target")
+                    .arg("upload")
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn();
+
+                match output {
+                    Ok(mut child) => {
+                        if let Some(stdout) = child.stdout.take() {
+                            let reader = std::io::BufReader::new(stdout);
+                            for line in reader.lines() {
+                                if let Ok(line) = line {
+                                    if !line.contains("warning:") && !line.contains("-W") {
+                                        log_clone.lock().unwrap().push(line.clone());
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Ok(status) = child.wait() {
+                            if status.success() {
+                                log_clone.lock().unwrap().push("Arduino flashed successfully.".to_string());
+                            } else {
+                                log_clone.lock().unwrap().push("Flash failed. Check log for details.".to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log_clone.lock().unwrap().push(format!(
+                            "Failed to execute platformio: {:?}\nPython path: {:?}\nProject dir: {:?}",
+                            e, python_exe, project_dir
+                        ));
+                    }
+                }
+            }
+            Err(e) => {
+                log_clone.lock().unwrap().push(format!("Error preparing PlatformIO project: {}", e));
+            }
+        }
+    });
+}
+
+fn get_app_directory() -> PathBuf {
+    std::env::current_exe()
+        .map(|exe_path| exe_path.parent().unwrap().to_path_buf())
+        .unwrap_or_else(|_| PathBuf::from("."))
+}
+
+fn get_project_directory() -> PathBuf {
+    get_app_directory().join("platformio_project")
 }
 
 fn parse_data(data: &[u8]) -> HatireData {
