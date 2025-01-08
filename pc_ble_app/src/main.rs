@@ -83,6 +83,11 @@ impl AppState {
         self.udp_socket.send(data)
             .map(|_| ())
     }
+
+    pub fn clear_log(&self) {
+        let mut log = self.log.lock().unwrap();
+        log.clear();
+    }
 }
 
 async fn handle_ble_connection(
@@ -319,6 +324,7 @@ impl eframe::App for MyApp {
                 if !is_usb {
                     if ui.add_sized([120.0, 30.0], egui::Button::new(button_label)).clicked() { // Slightly reduced height
                         let new_status = if status == "Off" {
+                            self.app_state.clear_log();
                             self.app_state.set_should_run(true);
                             self.app_state.log_message("Starting head tracking...");
                             "Scanning..."
@@ -342,7 +348,7 @@ impl eframe::App for MyApp {
                 if !is_usb {
                     ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino").sense(egui::Sense::hover()));
                 } else if ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino")).clicked() {
-                    self.app_state.log_message("Flashing Arduino...");
+                    self.app_state.clear_log();
                     let log_clone = self.app_state.log.clone();
                     flash_arduino(log_clone);
                 }
@@ -412,6 +418,7 @@ fn check_existing_pip(python_exe: &Path) -> bool {
         .arg("--version")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
+        .creation_flags(0x08000000)
         .status();
     output.map_or(false, |status| status.success())
 }
@@ -424,11 +431,12 @@ fn check_existing_platformio(python_exe: &Path) -> bool {
         .arg("platformio")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
+        .creation_flags(0x08000000)
         .status();
     output.map_or(false, |status| status.success())
 }
 
-fn download_and_setup_python() -> Result<PathBuf, String> {
+fn download_and_setup_python(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
     let python_dir = get_app_directory().join("python");
     let python_exe = python_dir.join("python.exe");
 
@@ -447,7 +455,7 @@ fn download_and_setup_python() -> Result<PathBuf, String> {
 
     // Download and extract main Python distribution
     let python_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-embed-amd64.zip";
-    println!("Downloading Python from {}", python_url);
+    log.lock().unwrap().push("Downloading Python...".to_string());
     let response = reqwest::blocking::get(python_url).map_err(|e| format!("Failed to download Python: {}", e))?;
     let mut archive = ZipArchive::new(Cursor::new(response.bytes().map_err(|e| e.to_string())?))
         .map_err(|e| format!("Failed to parse Python ZIP archive: {}", e))?;
@@ -470,7 +478,6 @@ fn download_and_setup_python() -> Result<PathBuf, String> {
 
     // Download and extract standard library
     let stdlib_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe";
-    println!("Downloading Python standard library...");
     let response = reqwest::blocking::get(stdlib_url).map_err(|e| format!("Failed to download stdlib: {}", e))?;
     
     // Save the exe temporarily
@@ -533,7 +540,7 @@ fn bootstrap_pip(python_exe: &Path, log: Arc<Mutex<Vec<String>>>) -> Result<(), 
     let _ = fs::remove_file(&get_pip_script);
 
     if output.status.success() {
-        log.lock().unwrap().push("Pip bootstrapped successfully.".to_string());
+        log.lock().unwrap().push("Pip install files cleaned up.".to_string());
         Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -543,7 +550,7 @@ fn bootstrap_pip(python_exe: &Path, log: Arc<Mutex<Vec<String>>>) -> Result<(), 
 }
 
 fn install_platformio(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
-    let python_exe = download_and_setup_python()?;
+    let python_exe = download_and_setup_python(log.clone())?;
 
     if check_existing_platformio(&python_exe) {
         log.lock().unwrap().push("PlatformIO is already installed.".to_string());
@@ -559,6 +566,7 @@ fn install_platformio(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
         .arg("platformio")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
+        .creation_flags(0x08000000)
         .output()
         .map_err(|e| format!("Failed to execute pip: {:?}", e))?;
 
@@ -676,7 +684,7 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
                 log_clone.lock().unwrap().push("Python already installed.".to_string());
                 python
             },
-            None => match download_and_setup_python() {
+            None => match download_and_setup_python(log.clone()) {
                 Ok(python) => {
                     log_clone.lock().unwrap().push("Python installed successfully.".to_string());
                     python
