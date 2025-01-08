@@ -9,6 +9,7 @@ use std::os::windows::process::CommandExt;
 use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use std::fs;
+use serde_json;
 use zip::ZipArchive;
 use std::io::Cursor;
 use std::path::{PathBuf, Path};
@@ -598,16 +599,56 @@ fn find_project_dir(base_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-fn prepare_platformio_project(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
-    let base_project_dir = get_project_directory();
-    
-    // Check if project already exists
-    if let Some(existing_dir) = find_project_dir(&base_project_dir) {
-        log.lock().unwrap().push("PlatformIO project already exists. Skipping download.".to_string());
-        return Ok(existing_dir);
+fn save_local_version(version: &str) -> Result<(), String> {
+    let version_file = get_project_directory().join("PlatformIO_AppVersion.txt");
+    fs::write(version_file, version).map_err(|e| format!("Failed to write version file: {}", e))
+}
+
+fn read_local_version() -> Option<String> {
+    let version_file = get_project_directory().join("PlatformIO_AppVersion.txt");
+    fs::read_to_string(version_file).ok()
+}
+
+fn fetch_latest_commit(repo_url: &str) -> Result<String, String> {
+    let api_url = format!("https://api.github.com/repos/{}/commits/V2_Update", repo_url);
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(&api_url)
+        .header("User-Agent", "rust-app")
+        .send()
+        .map_err(|e| format!("Failed to fetch commit info: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("GitHub API request failed: HTTP {}", response.status()));
     }
 
-    log.lock().unwrap().push("Downloading PlatformIO project...".to_string());
+    let json: serde_json::Value = response.json().map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    json["sha"]
+        .as_str()
+        .map(String::from)
+        .ok_or("Commit hash not found in response".to_string())
+}
+
+fn prepare_platformio_project(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, String> {
+    let base_project_dir = get_project_directory();
+    let repo_url = "FugLong/Nano33_PC_Head_Tracker";
+    
+    // Compare latest and local versions if local exists
+    //Download if necessary
+    let latest_version = fetch_latest_commit(repo_url).map_err(|e| {
+        log.lock().unwrap().push(format!("Failed to fetch latest project version: {}", e));
+        e
+    })?;
+    
+    let local_version = read_local_version();
+    
+    if local_version.as_deref() == Some(&latest_version) {
+        log.lock().unwrap().push("Project is up-to-date.".to_string());
+        return find_project_dir(&get_project_directory())
+            .ok_or("Failed to locate cached project".to_string());
+    }
+    
+    log.lock().unwrap().push(format!("Updating to version: {}...", latest_version));
 
     // Clean up any existing partial project
     if base_project_dir.exists() {
@@ -658,6 +699,10 @@ fn prepare_platformio_project(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, S
     // Verify the extraction using `find_project_dir`
     if let Some(project_dir) = find_project_dir(&base_project_dir) {
         log.lock().unwrap().push(format!("Project directory verified successfully: {:?}", project_dir));
+        save_local_version(&latest_version).map_err(|e| {
+            log.lock().unwrap().push(format!("Failed to save local version: {}", e));
+            e
+        })?;
         Ok(project_dir)
     } else {
         // Debugging: List contents of the base directory
