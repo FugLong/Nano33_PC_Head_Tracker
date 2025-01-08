@@ -46,17 +46,60 @@ struct AppState {
     status: Arc<Mutex<String>>,
     udp_socket: UdpSocket,
     should_run: Arc<Mutex<bool>>,
+    latest_script_version: Option<String>,
+    notification_message: Arc<Mutex<Option<String>>>,
+    is_flashing: Arc<Mutex<bool>>,
 }
 
 impl AppState {
     fn new() -> Self {
         let udp_socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind UDP socket");
         udp_socket.connect((UDP_IP, UDP_PORT)).expect("Failed to connect to OpenTrack");
+        let latest_script_version = fetch_latest_commit("FugLong/Nano33_PC_Head_Tracker").ok();
+
+        // Initialize notification_message
+        let notification_message = Arc::new(Mutex::new(None));
+
         Self {
             log: Arc::new(Mutex::new(Vec::new())),
             status: Arc::new(Mutex::new("Off".to_string())),
             udp_socket,
             should_run: Arc::new(Mutex::new(false)),
+            latest_script_version,
+            notification_message,
+            is_flashing: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    // Method to set flashing state
+    fn set_flashing(&self, is_flashing: bool) {
+        let mut state = self.is_flashing.lock().unwrap();
+        *state = is_flashing;
+    }
+
+    // Method to check flashing state
+    fn is_flashing(&self) -> bool {
+        *self.is_flashing.lock().unwrap()
+    }
+
+    // Method to check for updates
+    fn update_notification(&self) {
+        let latest_version = self.latest_script_version.as_ref();
+        let local_version = read_local_version();
+        
+        let mut notification = self.notification_message.lock().unwrap();
+        
+        if let Some(latest_version) = latest_version {
+            if local_version.as_deref() != Some(latest_version) {
+                // Notify if versions differ or if local version is missing
+                *notification = Some("New Update, Flash Recommended".to_string());
+            } else {
+                // Clear notification if versions match
+                *notification = None;
+            }
+        } else {
+            // Handle case where fetching latest version fails
+            *notification = Some("Unable to check for updates".to_string());
         }
     }
 
@@ -252,6 +295,9 @@ async fn run_ble_loop(state: Arc<AppState>) {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = Arc::new(AppState::new());
 
+    //Check for updates
+    app_state.update_notification();
+
     // BLE thread
     let state_clone = app_state.clone();
     thread::spawn(move || {
@@ -347,13 +393,35 @@ impl eframe::App for MyApp {
 
                 // Flash Arduino Button
                 if !is_usb {
-                    ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino").sense(egui::Sense::hover()));
-                } else if ui.add_sized([120.0, 30.0], egui::Button::new("Flash Arduino")).clicked() {
-                    self.app_state.clear_log();
-                    let log_clone = self.app_state.log.clone();
-                    flash_arduino(log_clone);
+                    ui.add_sized(
+                        [120.0, 30.0],
+                        egui::Button::new("Flash Arduino").sense(egui::Sense::hover())
+                    );
+                } else {
+                    let is_flashing = self.app_state.is_flashing();
+                    let button = egui::Button::new("Flash Arduino")
+                        .sense(if is_flashing {
+                            egui::Sense::hover() // Button only hovers when disabled
+                        } else {
+                            egui::Sense::click() // Button fully interactive when enabled
+                        });
+                
+                    if ui.add_sized([120.0, 30.0], button).clicked() {
+                        self.app_state.clear_log();
+                        let log_clone = self.app_state.log.clone();
+                        flash_arduino(&self.app_state, log_clone);
+                    }
                 }
-            });
+
+                // Notification bubble
+                if let Some(message) = &*self.app_state.notification_message.lock().unwrap() {
+                    ui.add_space(2.0); // Add space between the buttons and the notification
+                    ui.colored_label(
+                        egui::Color32::from_rgb(160, 160, 160), // Subtle gray color
+                        egui::RichText::new(message).size(12.0)
+                    );
+                }
+            });            
 
             ui.separator();
 
@@ -441,8 +509,8 @@ fn download_and_setup_python(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, St
     let python_dir = get_app_directory().join("python");
     let python_exe = python_dir.join("python.exe");
 
-    // If Python is already set up, return early
-    if python_exe.exists() && python_dir.join("Lib").exists() {
+    // If Python is already set up properly, return early
+    if python_exe.exists() && python_dir.join("Lib").exists() && python_dir.join("python311._pth").exists() {
         return Ok(python_exe);
     }
 
@@ -454,14 +522,14 @@ fn download_and_setup_python(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, St
     // Create fresh Python directory
     fs::create_dir_all(&python_dir).map_err(|e| format!("Failed to create Python directory: {}", e))?;
 
-    // Download and extract main Python distribution
+    // Download embedded Python distribution (includes stdlib)
     let python_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-embed-amd64.zip";
     log.lock().unwrap().push("Downloading Python...".to_string());
     let response = reqwest::blocking::get(python_url).map_err(|e| format!("Failed to download Python: {}", e))?;
     let mut archive = ZipArchive::new(Cursor::new(response.bytes().map_err(|e| e.to_string())?))
         .map_err(|e| format!("Failed to parse Python ZIP archive: {}", e))?;
 
-    // Extract main Python distribution
+    // Extract Python distribution
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(|e| format!("Failed to extract file from ZIP: {}", e))?;
         let out_path = python_dir.join(file.mangled_name());
@@ -477,35 +545,12 @@ fn download_and_setup_python(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, St
         }
     }
 
-    // Download and extract standard library
-    let stdlib_url = "https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe";
-    let response = reqwest::blocking::get(stdlib_url).map_err(|e| format!("Failed to download stdlib: {}", e))?;
-    
-    // Save the exe temporarily
-    let temp_exe = python_dir.join("python_installer.exe");
-    fs::write(&temp_exe, response.bytes().map_err(|e| e.to_string())?)
-        .map_err(|e| format!("Failed to save installer: {}", e))?;
-
-    // Extract the exe (it's actually a self-extracting archive)
-    let output = Command::new(&temp_exe)
-        .args(["/quiet", "/layout", python_dir.to_str().unwrap()])
-        .creation_flags(0x08000000)  // CREATE_NO_WINDOW
-        .output()
-        .map_err(|e| format!("Failed to extract stdlib: {}", e))?;
-
-    if !output.status.success() {
-        return Err(format!("Failed to extract stdlib: {:?}", output));
-    }
-
-    // Clean up installer
-    let _ = fs::remove_file(temp_exe);
-
-    // Create/modify python3XX._pth file
+    // Create/modify python3XX._pth file to enable pip installation
     let pth_file_path = python_dir.join("python311._pth");
     let pth_contents = "python311.zip\n.\nLib/site-packages\nimport site";
     fs::write(&pth_file_path, pth_contents).map_err(|e| format!("Failed to write _pth file: {}", e))?;
 
-    // Create empty Lib/site-packages directory if it doesn't exist
+    // Create empty Lib/site-packages directory
     fs::create_dir_all(python_dir.join("Lib").join("site-packages"))
         .map_err(|e| format!("Failed to create site-packages directory: {}", e))?;
 
@@ -718,10 +763,12 @@ fn prepare_platformio_project(log: Arc<Mutex<Vec<String>>>) -> Result<PathBuf, S
     }
 }
 
-fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
+fn flash_arduino(app_state: &Arc<AppState>, log: Arc<Mutex<Vec<String>>>) {
     let log_clone = log.clone();
+    let app_state_clone = app_state.clone();
 
     thread::spawn(move || {
+        app_state_clone.set_flashing(true);
         log_clone.lock().unwrap().push("Starting Arduino flashing process...".to_string());
 
         let python_exe = match check_existing_python() {
@@ -736,6 +783,7 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
                 },
                 Err(e) => {
                     log_clone.lock().unwrap().push(format!("Error setting up Python: {}", e));
+                    app_state_clone.set_flashing(false);
                     return;
                 }
             },
@@ -744,6 +792,7 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
         if !check_existing_pip(&python_exe) {
             if let Err(e) = bootstrap_pip(&python_exe, log_clone.clone()) {
                 log_clone.lock().unwrap().push(format!("Error setting up pip: {}", e));
+                app_state_clone.set_flashing(false);
                 return;
             } else {
                 log_clone.lock().unwrap().push("Pip installed successfully.".to_string());
@@ -755,6 +804,7 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
         if !check_existing_platformio(&python_exe) {
             if let Err(e) = install_platformio(log_clone.clone()) {
                 log_clone.lock().unwrap().push(format!("Error installing PlatformIO: {}", e));
+                app_state_clone.set_flashing(false);
                 return;
             } else {
                 log_clone.lock().unwrap().push("PlatformIO installed successfully.".to_string());
@@ -795,8 +845,11 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
                         if let Ok(status) = child.wait() {
                             if status.success() {
                                 log_clone.lock().unwrap().push("Arduino flashed successfully.".to_string());
+                                app_state_clone.set_flashing(false);
+                                app_state_clone.update_notification();
                             } else {
                                 log_clone.lock().unwrap().push("Flash failed. Check log for details.".to_string());
+                                app_state_clone.set_flashing(false);
                             }
                         }
                     }
@@ -805,6 +858,7 @@ fn flash_arduino(log: Arc<Mutex<Vec<String>>>) {
                             "Failed to execute platformio: {:?}\nPython path: {:?}\nProject dir: {:?}",
                             e, python_exe, project_dir
                         ));
+                        app_state_clone.set_flashing(false);
                     }
                 }
             }

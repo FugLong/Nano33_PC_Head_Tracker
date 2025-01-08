@@ -2,4 +2,4 @@
 build/
 temp/
 .pio/
-pc_ble_app/target/
+pc_app/target/

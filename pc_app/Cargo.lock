@@ -3,6 +3,26 @@
 version = 4
 
 [[package]]
+name = "Nano33_Head_Tracker"
+version = "0.1.0"
+dependencies = [
+ "btleplug",
+ "bytemuck",
+ "eframe",
+ "env_logger",
+ "futures",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serialport",
+ "tokio",
+ "uuid",
+ "winapi",
+ "zip",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2611,26 +2631,6 @@ dependencies = [
  "hmac",
  "password-hash",
  "sha2",
-]
-
-[[package]]
-name = "pc_ble_app"
-version = "0.1.0"
-dependencies = [
- "btleplug",
- "bytemuck",
- "eframe",
- "env_logger",
- "futures",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "serialport",
- "tokio",
- "uuid",
- "winapi",
- "zip",
 ]
 
 [[package]]
