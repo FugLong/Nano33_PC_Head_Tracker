@@ -26,7 +26,7 @@ pub struct HatireData {
     pub footer: u16,
 }
 
-pub fn is_usb_connection() -> bool {
+pub fn is_usb_connection(_app_state: &AppState) -> bool {
     use serialport::{available_ports, SerialPortType};
     if let Ok(ports) = available_ports() {
         for port in ports {
@@ -40,7 +40,7 @@ pub fn is_usb_connection() -> bool {
 }
 
 pub fn is_ble_connection(app_state: &AppState) -> bool {
-    let status = app_state.status.lock().unwrap().clone();
+    let status = app_state.get_status();
     status == "Connected"
 }
 

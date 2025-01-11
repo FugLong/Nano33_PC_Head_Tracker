@@ -32,7 +32,7 @@ pub async fn handle_ble_connection(
     }
 
     if peripheral.is_connected().await? {
-        state.update_ble_status("Connected");
+        state.update_status("Connected");
         state.log_message("Device connected. Discovering services...");
 
         peripheral.discover_services().await?;
@@ -123,7 +123,7 @@ pub async fn run_ble_loop(state: Arc<AppState>) {
     state.log_message(&format!("Using adapter: {:?}", central.adapter_info().await.unwrap()));
 
     while state.should_run() {
-        state.update_ble_status("Scanning...");
+        state.update_status("Scanning...");
         state.log_message("Scanning for head tracker device...");
         
         // Create a scan filter that looks for our device name
@@ -169,6 +169,6 @@ pub async fn run_ble_loop(state: Arc<AppState>) {
         }
     }
     
-    state.update_ble_status("Off");
+    state.update_status("Off");
     state.log_message("Tracking stopped");
 }

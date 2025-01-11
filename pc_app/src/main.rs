@@ -6,6 +6,7 @@ mod utilities;
 
 use crate::app_state::AppState;
 use crate::ble_udp_loop::run_ble_loop;
+use crate::utilities::is_usb_connection;
 
 use std::sync::Arc;
 use std::thread;
@@ -31,6 +32,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 thread::sleep(Duration::from_secs(1));
             }
         });
+    });
+
+    // USB thread
+    let state_clone = app_state.clone();
+    thread::spawn(move || {
+        loop {
+            let is_usb = is_usb_connection(&state_clone);
+            state_clone.set_usb_connected(is_usb);
+            thread::sleep(Duration::from_secs(1)); // Poll every 500ms
+        }
     });
 
     // Start the UI

@@ -30,19 +30,27 @@ impl MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        {
+            let mut context = self.app_state.egui_ctx.lock().unwrap();
+            if context.is_none() {
+                *context = Some(ctx.clone());
+            }
+        }
+        
+        let is_usb = is_usb_connection(&self.app_state);
+        let is_ble = is_ble_connection(&self.app_state);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             // Horizontal layout for the buttons and indicators
             ui.horizontal(|ui| {
                 // Fake LED indicator
-                let is_usb = is_usb_connection();
-                let is_ble = is_ble_connection(&self.app_state);
                 let led_color = if is_usb || is_ble { egui::Color32::GREEN } else { egui::Color32::RED };
                 ui.add(egui::Label::new(egui::RichText::new(" ").background_color(led_color).size(28.0)));
                 ui.vertical(|ui| {
-                    let connection_text = if is_usb || is_ble { "Connected" } else { "Disconnected" };
+                    let connection_text = if self.app_state.is_usb_connected() || is_ble { "Connected" } else { "Disconnected" };
                     ui.label(egui::RichText::new(connection_text));
                     ui.horizontal(|ui| {
-                        let usb_color = if is_usb {
+                        let usb_color = if self.app_state.is_usb_connected() {
                             egui::Color32::GREEN
                         } else {
                             egui::Color32::GRAY
@@ -61,7 +69,7 @@ impl eframe::App for MyApp {
                 });
 
                 // Start/Stop BLE Button
-                let status = self.app_state.status.lock().unwrap().clone();
+                let status = self.app_state.get_status();
                 let button_label = if status == "Off" { "Start BLE" } else { "Stop BLE" };
                 if !is_usb {
                     if ui.add_sized([120.0, 30.0], egui::Button::new(button_label)).clicked() { // Slightly reduced height
@@ -75,13 +83,13 @@ impl eframe::App for MyApp {
                             self.app_state.log_message("Stopping head tracking...");
                             "Off"
                         };
-                        self.app_state.update_ble_status(new_status);
+                        self.app_state.update_status(new_status);
                     }
                 } else {
                     if status != "Off" {
                         self.app_state.set_should_run(false);
                         self.app_state.log_message("Stopping BLE loop due to USB connection...");
-                        self.app_state.update_ble_status("Off");
+                        self.app_state.update_status("Off");
                     }
                     ui.add_sized([120.0, 30.0], egui::Button::new(button_label).sense(egui::Sense::hover()));
                 }
@@ -141,6 +149,10 @@ impl eframe::App for MyApp {
                     );
                 });            
         });
-        ctx.request_repaint();
+        // Check if a repaint is needed
+        if self.app_state.is_repaint_needed() {
+            ctx.request_repaint();
+            self.app_state.set_repaint_needed(false);
+        }
     }
 }

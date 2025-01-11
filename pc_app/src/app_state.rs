@@ -1,5 +1,6 @@
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
+use eframe::egui;
 use crate::utilities::{UDP_IP, UDP_PORT, fetch_latest_commit, read_local_version};
 
 pub struct AppState {
@@ -7,9 +8,12 @@ pub struct AppState {
     pub status: Arc<Mutex<String>>,
     pub udp_socket: UdpSocket,
     pub should_run: Arc<Mutex<bool>>,
+    pub is_usb_connected: Arc<Mutex<bool>>,
     pub latest_script_version: Option<String>,
     pub notification_message: Arc<Mutex<Option<String>>>,
     pub is_flashing: Arc<Mutex<bool>>,
+    pub repaint_needed: Arc<Mutex<bool>>,
+    pub egui_ctx: Arc<Mutex<Option<egui::Context>>>,
 }
 
 impl AppState {
@@ -26,10 +30,28 @@ impl AppState {
             status: Arc::new(Mutex::new("Off".to_string())),
             udp_socket,
             should_run: Arc::new(Mutex::new(false)),
+            is_usb_connected: Arc::new(Mutex::new(false)),
             latest_script_version,
             notification_message,
             is_flashing: Arc::new(Mutex::new(false)),
+            repaint_needed: Arc::new(Mutex::new(false)),
+            egui_ctx: Arc::new(Mutex::new(None)),
         }
+    }
+
+    // Method to set usb connected state
+    pub fn set_usb_connected(&self, is_connected: bool) {
+        let mut state = self.is_usb_connected.lock().unwrap();
+        if *state != is_connected {
+            *state = is_connected;
+            self.set_repaint_needed(true);
+        }
+    }
+
+    // Method to check usb connected state
+    pub fn is_usb_connected(&self) -> bool {
+        let state = self.is_usb_connected.lock().unwrap();
+        *state
     }
 
     // Method to set flashing state
@@ -47,32 +69,46 @@ impl AppState {
     pub fn update_notification(&self) {
         let latest_version = self.latest_script_version.as_ref();
         let local_version = read_local_version();
-        
+
         let mut notification = self.notification_message.lock().unwrap();
-        
+
         if let Some(latest_version) = latest_version {
-            if local_version.as_deref() != Some(latest_version) {
+            let do_versions_differ = local_version.as_deref() != Some(latest_version);
+            if do_versions_differ {
                 // Notify if versions differ or if local version is missing
-                *notification = Some("New Update, Flash Recommended".to_string());
-            } else {
+                if notification.as_deref() != Some("New Update, Flash Recommended") {
+                    *notification = Some("New Update, Flash Recommended".to_string());
+                    self.set_repaint_needed(true);
+                }
+            } else if notification.as_deref() != None{
                 // Clear notification if versions match
-                *notification = None;
+                if notification.is_some() {
+                    *notification = None;
+                    self.set_repaint_needed(true);
+                }
             }
         } else {
             // Handle case where fetching latest version fails
-            *notification = Some("Unable to check for updates".to_string());
+            if notification.as_deref() != Some("Unable to check for updates") {
+                *notification = Some("Unable to check for updates".to_string());
+            }
         }
     }
 
     pub fn log_message(&self, message: &str) {
         let mut log = self.log.lock().unwrap();
         log.push(message.to_string());
-        println!("{}", message); // Also print to console for debugging
+        self.set_repaint_needed(true);
     }
 
-    pub fn update_ble_status(&self, new_status: &str) {
+    pub fn update_status(&self, new_status: &str) {
         let mut status = self.status.lock().unwrap();
+        self.set_repaint_needed(true); // Mark repaint needed
         *status = new_status.to_string();
+    }
+
+    pub fn get_status(&self) -> String {
+        self.status.lock().unwrap().clone()
     }
 
     pub fn set_should_run(&self, should_run: bool) {
@@ -91,6 +127,24 @@ impl AppState {
 
     pub fn clear_log(&self) {
         let mut log = self.log.lock().unwrap();
+        self.set_repaint_needed(true); // Mark repaint needed
         log.clear();
+    }
+
+    pub fn set_repaint_needed(&self, value: bool) {
+        let mut repaint = self.repaint_needed.lock().unwrap();
+        *repaint = value;
+        
+        // Force egui to wake up if we're setting repaint to true
+        if value {
+            if let Some(ctx) = self.egui_ctx.lock().unwrap().as_ref() {
+                ctx.request_repaint();
+            }
+        }
+    }
+    
+    pub fn is_repaint_needed(&self) -> bool {
+        let value = *self.repaint_needed.lock().unwrap();
+        value
     }
 }
