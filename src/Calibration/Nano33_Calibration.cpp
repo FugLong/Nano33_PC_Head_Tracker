@@ -9,7 +9,7 @@
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
-// Define calibration (replace with actual calibration data if available)
+// Define calibration
 FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
 FusionVector gyroscopeSensitivity = {1.0f, 1.0f, 1.0f};
 FusionVector gyroscopeOffset = {0.0f, 0.0f, 0.0f};
@@ -40,6 +40,10 @@ float Cdeltat;
 
 // FileSystem object
 FileSystem_MBED *myFS;
+
+// Buffer for magnetometer data
+float magData[1000][3];
+int sampleCount = 0;
 
 String FusionVectorToString(const FusionVector &vector) {
     String result = "(";
@@ -132,14 +136,15 @@ bool loadCalibrationData() {
             logString(", ", false);
             logString(calibrationData.gyroscopeOffset.axis.z, true);
 
-            /* Not saved currently, using defaults
+            // Not saved currently, using defaults
             logString("Gyro Misalignment Matrix:", true);
             for (int row = 0; row < 3; row++) {
                 for (int col = 0; col < 3; col++) {
-                    Serial.print(calibrationData.gyroscopeMisalignment.array[row][col], 6);
-                    Serial.print(col < 2 ? ", " : "\n");
+                    logString(calibrationData.gyroscopeMisalignment.array[row][col], false);
+                    logString(col < 2 ? ", " : "\n", false);
+    
                 }
-            } */
+            }
 
             logString("Gyro Sensitivity: ", false);
             logString(calibrationData.gyroscopeSensitivity.axis.x, false);
@@ -156,14 +161,14 @@ bool loadCalibrationData() {
             logString(", ", false);
             logString(calibrationData.accelerometerOffset.axis.z, true);
 
-            /*Not currently saved, using defaults
+            // Not currently saved, using defaults
             Serial.println("Accel Misalignment Matrix:");
             for (int row = 0; row < 3; row++) {
                 for (int col = 0; col < 3; col++) {
-                    Serial.print(calibrationData.accelerometerMisalignment.array[row][col], 6);
-                    Serial.print(col < 2 ? ", " : "\n");
+                    logString(calibrationData.accelerometerMisalignment.array[row][col], false);
+                    logString(col < 2 ? ", " : "\n", false);
                 }
-            } */
+            }
 
             // Print Accelerometer Calibration
             logString("Accel Sensitivity: ", false);
@@ -173,21 +178,21 @@ bool loadCalibrationData() {
             logString(", ", false);
             logString(calibrationData.accelerometerSensitivity.axis.z, true);
 
-            /* Print Magnetometer Calibration (not currently saved, using defaults)
-            Serial.print("Mag Hard Iron Offsets: ");
-            Serial.print(calibrationData.hardIronOffset.axis.x);
-            Serial.print(", ");
-            Serial.print(calibrationData.hardIronOffset.axis.y);
-            Serial.print(", ");
-            Serial.println(calibrationData.hardIronOffset.axis.z);
+            // Print Magnetometer Calibration (not currently saved, using defaults)
+            logString("Mag Hard Iron Offsets: ", false);
+            logString(calibrationData.hardIronOffset.axis.x, false);
+            logString(", ", false);
+            logString(calibrationData.hardIronOffset.axis.y, false);
+            logString(", ", false);
+            logString(calibrationData.hardIronOffset.axis.z, true);
 
-            Serial.println("Soft Iron Matrix:");
+            logString("Soft Iron Matrix:", true);
             for (int row = 0; row < 3; row++) {
                 for (int col = 0; col < 3; col++) {
-                    Serial.print(calibrationData.softIronMatrix.array[row][col], 6);
-                    Serial.print(col < 2 ? ", " : "\n");
+                    logString(calibrationData.softIronMatrix.array[row][col], false);
+                    logString(col < 2 ? ", " : "\n", false);
                 }
-            } */
+            }
 
             return true;
         } else {
@@ -212,6 +217,7 @@ void calibrateGyroscope() {
     for (int i = 0; i < totalSamples; i++) {
         if (IMU.gyroAvailable()) {
             IMU.readRawGyro(CgX, CgY, CgZ);
+            CgX *= -1.0; //Invert for goofy imu
             gXSum += CgX;
             gYSum += CgY;
             gZSum += CgZ;
@@ -238,6 +244,7 @@ void calibrateAccelerometer() {
     for (int i = 0; i < 2000; i++) {
         if (IMU.accelAvailable()) {
             IMU.readRawAccel(CaX, CaY, CaZ);
+            CaX *= -1.0;
 
             aMin[0] = min(aMin[0], CaX);
             aMax[0] = max(aMax[0], CaX);
@@ -262,134 +269,98 @@ void calibrateAccelerometer() {
 }
 
 ///////////////////////////////////////////////////////////////////
+// Collect Magnetometer Data
+///////////////////////////////////////////////////////////////////
+void collectMagnetometerData() {
+    sampleCount = 0;
+    while (sampleCount < 1000) {
+        if (IMU.magneticFieldAvailable()) {
+            IMU.readRawMagnet(magData[sampleCount][0],
+                              magData[sampleCount][1],
+                              magData[sampleCount][2]);
+            sampleCount++;
+            delay(10);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////
+// Magnetometer Calibration - Improved
+///////////////////////////////////////////////////////////////////
+bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionMatrix &softIronMatrix) {
+    using namespace BLA;
+
+    BLA::Matrix<9, 9> A;
+    BLA::Matrix<9> B;
+
+    A.Fill(0.0);
+    B.Fill(0.0);
+
+    for (int i = 0; i < numSamples; i++) {
+        float x = data[i][0], y = data[i][1], z = data[i][2];
+        float d[9] = {x * x, y * y, z * z, 2 * x * y, 2 * x * z, 2 * y * z, 2 * x, 2 * y, 2 * z};
+        for (int j = 0; j < 9; j++) {
+            for (int k = 0; k < 9; k++) {
+                A(j, k) += d[j] * d[k];
+            }
+            B(j) -= d[j];
+        }
+    }
+
+    for (int i = 0; i < 9; i++) {
+        float pivot = A(i, i);
+        for (int j = 0; j < 9; j++) {
+            A(i, j) /= pivot;
+        }
+        B(i) /= pivot;
+
+        for (int k = 0; k < 9; k++) {
+            if (k != i) {
+                float factor = A(k, i);
+                for (int j = 0; j < 9; j++) {
+                    A(k, j) -= factor * A(i, j);
+                }
+                B(k) -= factor * B(i);
+            }
+        }
+    }
+
+    offset.axis.x = -B(6) / (2 * B(0));
+    offset.axis.y = -B(7) / (2 * B(1));
+    offset.axis.z = -B(8) / (2 * B(2));
+
+    softIronMatrix = {
+        1.0f / sqrt(B(0)), 0.0f, 0.0f,
+        0.0f, 1.0f / sqrt(B(1)), 0.0f,
+        0.0f, 0.0f, 1.0f / sqrt(B(2))
+    };
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////
 // Magnetometer Calibration
 ///////////////////////////////////////////////////////////////////
 void calibrateMagnetometer() {
     logString("Calibrating magnetometer... Move the device in a figure-eight pattern.", true);
 
-    const int maxSamples = 1000;       // Maximum samples to collect
-    const int minSamples = 50;         // Minimum samples before checking range
-    const float minRangeThreshold = 30.0f;  // Minimum acceptable range per axis
-    const unsigned long noImprovementThreshold = 5000; // 5 seconds with no range improvement
+    collectMagnetometerData();
 
-    float magData[maxSamples][3];
-    int collectedSamples = 0;
+    FusionVector hardIronOffset;
+    FusionMatrix softIronMatrix;
+    if (fitEllipsoid(magData, sampleCount, hardIronOffset, softIronMatrix)) {
+        calibrationData.hardIronOffset = hardIronOffset;
+        calibrationData.softIronMatrix = softIronMatrix;
 
-    // Initialize min and max values for range checking
-    float mMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
-    float mMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-
-    // Track the last improvement in range
-    unsigned long lastImprovementTime = millis();
-
-    while (true) {
-        if (IMU.magneticFieldAvailable()) {
-            IMU.readRawMagnet(CmX, CmY, CmZ);
-
-            // Store data if space is available
-            if (collectedSamples < maxSamples) {
-                magData[collectedSamples][0] = CmX;
-                magData[collectedSamples][1] = CmY;
-                magData[collectedSamples][2] = CmZ;
-                collectedSamples++;
-            }
-
-            // Update min and max values and check for improvement
-            bool improved = false;
-            for (int i = 0; i < 3; i++) {
-                if (CmX < mMin[i]) {
-                    mMin[i] = CmX;
-                    improved = true;
-                }
-                if (CmX > mMax[i]) {
-                    mMax[i] = CmX;
-                    improved = true;
-                }
-            }
-
-            // Check for improvement
-            if (improved) {
-                lastImprovementTime = millis();
-                logString("Improved range detected. Current range (X, Y, Z): ", false);
-                logString(mMax[0] - mMin[0], false);
-                logString(", ", false);
-                logString(mMax[1] - mMin[1], false);
-                logString(", ", false);
-                logString(mMax[2] - mMin[2], true);
-            }
-
-            // Feedback at intervals
-            if (collectedSamples % 50 == 0) {
-                logString("Samples collected: ", false);
-                logString(collectedSamples, true);
-                logString("Current range (X, Y, Z): ", false);
-                logString(mMax[0] - mMin[0], false);
-                logString(", ", false);
-                logString(mMax[1] - mMin[1], false);
-                logString(", ", false);
-                logString(mMax[2] - mMin[2], true);
-                logString("Keep moving the device in a figure-eight pattern.", true);
-            }
-        }
-
-        // Ensure minimum samples are collected before evaluating range
-        if (collectedSamples >= minSamples &&
-            (mMax[0] - mMin[0] > minRangeThreshold) &&
-            (mMax[1] - mMin[1] > minRangeThreshold) &&
-            (mMax[2] - mMin[2] > minRangeThreshold)) {
-            logString("Sufficient range detected. Finalizing calibration...", true);
-            break;
-        }
-
-        // Stop if no improvement is seen for a while
-        if (millis() - lastImprovementTime > noImprovementThreshold && collectedSamples >= minSamples) {
-            logString("No significant improvement detected. Finalizing calibration...", true);
-            break;
-        }
-
-        // End if maximum samples are collected
-        if (collectedSamples >= maxSamples) {
-            logString("Maximum samples reached. Finalizing calibration...", true);
-            break;
-        }
-
-        delay(50);  // Allow sensor to stabilize
-    }
-
-    // Calculate hard iron offsets
-    calibrationData.hardIronOffset = {
-        (mMax[0] + mMin[0]) / 2.0f,
-        (mMax[1] + mMin[1]) / 2.0f,
-        (mMax[2] + mMin[2]) / 2.0f
-    };
-
-    // Perform soft iron correction
-    float deltaX = (mMax[0] - mMin[0]) / 2.0f;
-    float deltaY = (mMax[1] - mMin[1]) / 2.0f;
-    float deltaZ = (mMax[2] - mMin[2]) / 2.0f;
-
-    if (deltaX < minRangeThreshold || deltaY < minRangeThreshold || deltaZ < minRangeThreshold) {
-        logString("Warning: Insufficient range detected. Using identity matrix for soft iron calibration.", true);
-        calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX;
+        logString("Magnetometer calibration complete.", true);
+        logString("Hard Iron Offset: " + FusionVectorToString(hardIronOffset), true);
+        logString("Soft Iron Matrix:", true);
+        logString("XX: " + String(softIronMatrix.element.xx, 6) + ", YY: " +
+                  String(softIronMatrix.element.yy, 6) + ", ZZ: " +
+                  String(softIronMatrix.element.zz, 6), true);
     } else {
-        calibrationData.softIronMatrix = {
-            1.0f / deltaX, 0.0f, 0.0f,
-            0.0f, 1.0f / deltaY, 0.0f,
-            0.0f, 0.0f, 1.0f / deltaZ
-        };
+        logString("Ellipsoid fitting failed. Calibration aborted.", true);
     }
-
-    /* Debugging output
-    logString("Magnetometer calibration complete.", true);
-    logString("Hard Iron Offset: ", false);
-    logString(FusionVectorToString(calibrationData.hardIronOffset), true);
-    logString("Soft Iron Matrix: ", true);
-    logString("XX: ", false);
-    Serial.print(calibrationData.softIronMatrix.element.xx, 6);
-    Serial.print(", YY: ");
-    Serial.print(calibrationData.softIronMatrix.element.yy, 6);
-    Serial.print(", ZZ: ");
-    Serial.println(calibrationData.softIronMatrix.element.zz, 6);*/
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -401,17 +372,17 @@ void runCalibrationSequence() {
     calibrationData.accelerometerMisalignment = FUSION_IDENTITY_MATRIX;
     calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX; // For magnetometer
 
-    //GYRO STAGE BLUE
-    setColorLedState("blue"); // Turn on blue LED to indicate calibration
+    // GYRO STAGE BLUE
+    setColorLedState("blue"); // Turn on Blue LED to indicate calibration
     calibrateGyroscope();
 
-    //ACCEL STAGE GREEN
+    // ACCEL STAGE GREEN
     setColorLedState("green");
     calibrateAccelerometer();
 
-    /*MAG STAGE LIGHT BLUE
-    digitalWrite(BLUE, LOW);//Blue ON
-    calibrateMagnetometer();*/
+    // MAG STAGE LIGHT BLUE
+    setColorLedState("cyan");
+    calibrateMagnetometer();
 
     setColorLedState("off");
     logString("Calibration sequence completed.", true);

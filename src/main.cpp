@@ -55,8 +55,8 @@ void setupFusion(){
         accelerometerMisalignment = calibrationData.accelerometerMisalignment;
         accelerometerSensitivity = calibrationData.accelerometerSensitivity;
         accelerometerOffset = calibrationData.accelerometerOffset;
-        //softIronMatrix = calibrationData.softIronMatrix;
-        //hardIronOffset = calibrationData.hardIronOffset;
+        softIronMatrix = calibrationData.softIronMatrix;
+        hardIronOffset = calibrationData.hardIronOffset;
     }
 
     FusionOffsetInitialise(&offset, SAMPLE_RATE);
@@ -74,7 +74,7 @@ void setupFusion(){
 void updateAngles() {
     if (IMU.gyroAvailable()) {
         IMU.readRawGyro(gX, gY, gZ);
-        gX *= -1.0; // Apply calibration and flip X axis
+        gX *= -1.0; // flip X axis
     }
 
     if (IMU.accelAvailable()) {
@@ -198,8 +198,8 @@ void loop() {
 
     //Wait for serial or BLE conenection here
     //If calibration enabled, check if the user is shaking the device during this time
-    while (!Serial && !BLE.central() && EnableCalibration){
-        if (detectShake()) {
+    while (!Serial && !BLE.central()){
+        if (detectShake() && EnableCalibration) {
             logString("Shake detected! Clearing calibration data...", true);
             setColorLedState("orange");
             clearCalibrationData();
@@ -211,7 +211,7 @@ void loop() {
         }
         delay(1000);
     }
-
+    setDataLedState(false);
     if (Serial || BLE.central()) {
 
         BLEDevice central = BLE.central();

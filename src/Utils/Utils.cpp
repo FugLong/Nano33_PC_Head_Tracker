@@ -223,6 +223,10 @@ void setColorLedState(String Color) {
         digitalWrite(RED, LOW);
         digitalWrite(GREEN, HIGH);
         digitalWrite(BLUE, LOW);
+    } else if (Color.equalsIgnoreCase("Cyan")) {
+        digitalWrite(RED, HIGH);
+        digitalWrite(GREEN, LOW);
+        digitalWrite(BLUE, LOW);
     } else if (Color.equalsIgnoreCase("White")) {
         digitalWrite(RED, LOW);
         digitalWrite(GREEN, LOW);
