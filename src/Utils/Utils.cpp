@@ -24,11 +24,12 @@ void updateBatteryLEDs(float batteryVoltage) {
     if (batteryVoltage <= 3.3) {
         // Flash red LED for low battery warning
         for (int i = 0; i < 3; i++) {
-            setColorLedState("red");
-            delay(250);
             setColorLedState("off");
             delay(250);
+            setColorLedState("red");
+            delay(250);
         }
+        setColorLedState("off");
     } else {
         float range = MAX_BATTERY_VOLTAGE - LOW_BATTERY_THRESHOLD;
         float normalized = (batteryVoltage - LOW_BATTERY_THRESHOLD) / range;

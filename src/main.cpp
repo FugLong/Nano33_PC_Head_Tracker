@@ -11,11 +11,11 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.5f, //0.5 initial default
+        .gain = 0.12f, //0.5 initial default
         .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
         .accelerationRejection = 10.0f, //10 inital default 
-        .magneticRejection = 10.0f, //10 initial default
-        .recoveryTriggerPeriod = 5000, // 5 seconds initial default - 5000
+        .magneticRejection = 150.0f, //10 initial default
+        .recoveryTriggerPeriod = 2500, // 5 seconds initial default - 5000
 };
 
 // Initialise algorithms
@@ -46,6 +46,8 @@ void setupFusion(){
         if (!loadCalibrationData()) {
             runCalibrationSequence();
             saveCalibrationData();
+            delay(100);
+            NVIC_SystemReset();
         }
 
         // Apply loaded calibration data
