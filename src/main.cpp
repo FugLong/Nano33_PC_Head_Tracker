@@ -11,10 +11,10 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.5f, //0.5 initial default
+        .gain = 0.333f, //0.5 initial default
         .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
-        .accelerationRejection = 10.0f, //10 inital default 
-        .magneticRejection = 10.0f, //10 initial default
+        .accelerationRejection = 12.0f, //10 inital default 
+        .magneticRejection = 12.0f, //10 initial default
         .recoveryTriggerPeriod = 5000, // 5 seconds initial default - 5000
 };
 
@@ -108,7 +108,6 @@ void updateAngles() {
 
     // Update gyroscope AHRS algorithm
     FusionAhrsUpdate(&ahrs, gyroscope, accelerometer, magnetometer, deltaTime);
-    //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, deltaTime);
 
     // Set algorithm outputs
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
