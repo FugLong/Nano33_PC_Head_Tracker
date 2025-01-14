@@ -11,7 +11,7 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.5f, //0.5 initial default
+        .gain = 0.333f, //0.5 initial default
         .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
         .accelerationRejection = 12.0f, //10 inital default 
         .magneticRejection = 12.0f, //10 initial default
