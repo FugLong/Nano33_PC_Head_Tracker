@@ -108,6 +108,7 @@ void updateAngles() {
 
     // Update gyroscope AHRS algorithm
     FusionAhrsUpdate(&ahrs, gyroscope, accelerometer, magnetometer, deltaTime);
+    //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, deltaTime);
 
     // Set algorithm outputs
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
