@@ -4,6 +4,8 @@
 #include <FS_Nano33BLE.h>
 #include <Arduino_LSM9DS1.h>
 #include <Fusion/Fusion.h>
+#include <vector>
+#include <numeric>
 
 // Constants
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
@@ -51,5 +53,8 @@ void calibrateGyroscope();
 void calibrateAccelerometer();
 void calibrateMagnetometer();
 void runCalibrationSequence();
+bool fitSphere(const std::vector<FusionVector>& data, FusionVector& offset, FusionMatrix& sensitivity);
+bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionMatrix &softIronMatrix);
+void collectMagnetometerData();
 
 #endif // NANO33_CALIBRATION_H

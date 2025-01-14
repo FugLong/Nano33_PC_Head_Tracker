@@ -6,6 +6,8 @@
 #include <Utils/Utils.h>
 #include <Fusion/Fusion.h>
 #include <BasicLinearAlgebra.h>
+#include <vector>
+#include <numeric>
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
@@ -240,27 +242,105 @@ bool loadCalibrationData() {
 // Gyro Calibration
 ///////////////////////////////////////////////////////////////////
 void calibrateGyroscope() {
-    logString("Calibrating gyroscope... Ensure the device is stationary.", true);
+    logString("Starting gyroscope calibration... Ensure device is stationary.", true);
 
-    float gXSum = 0.0f, gYSum = 0.0f, gZSum = 0.0f;
+    std::vector<float> gXReadings, gYReadings, gZReadings;
     const int totalSamples = 500;
 
     for (int i = 0; i < totalSamples; i++) {
         if (IMU.gyroAvailable()) {
             IMU.readRawGyro(CgX, CgY, CgZ);
-            CgX *= -1.0; //Invert for goofy imu
-            gXSum += CgX;
-            gYSum += CgY;
-            gZSum += CgZ;
+            CgX *= -1.0; // Invert for sensor alignment
+            gXReadings.push_back(CgX);
+            gYReadings.push_back(CgY);
+            gZReadings.push_back(CgZ);
         }
         delay(10);
     }
 
-    calibrationData.gyroscopeOffset = { gXSum / totalSamples, gYSum / totalSamples, gZSum / totalSamples };
-    calibrationData.gyroscopeSensitivity = { 1.0f, 1.0f, 1.0f }; // Default sensitivity
+    auto mean = [](const std::vector<float>& data) {
+        return std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
+    };
+
+    calibrationData.gyroscopeOffset = {
+        mean(gXReadings),
+        mean(gYReadings),
+        mean(gZReadings)
+    };
+
+    calibrationData.gyroscopeSensitivity = {1.0f, 1.0f, 1.0f}; // Default sensitivity
     logString("Gyroscope calibration complete.", true);
     logString("Offsets: ", false);
     logString(FusionVectorToString(calibrationData.gyroscopeOffset), true);
+}
+
+///////////////////////////////////////////////////////////////////
+// Sphere Fitting for Accelerometer Calibration
+///////////////////////////////////////////////////////////////////
+bool fitSphere(const std::vector<FusionVector>& data, FusionVector& offset, FusionMatrix& sensitivity) {
+    logString("Starting sphere fitting for accelerometer...", true);
+
+    using namespace BLA;
+    Matrix<4, 4> A = Zeros<4, 4>();
+    Matrix<4> B = Zeros<4>();
+
+    for (const auto& point : data) {
+        float x = point.axis.x, y = point.axis.y, z = point.axis.z;
+        float r2 = x * x + y * y + z * z;
+
+        A(0, 0) += x * x;
+        A(0, 1) += x * y;
+        A(0, 2) += x * z;
+        A(0, 3) += x;
+        A(1, 1) += y * y;
+        A(1, 2) += y * z;
+        A(1, 3) += y;
+        A(2, 2) += z * z;
+        A(2, 3) += z;
+        A(3, 3) += 1;
+
+        B(0) -= r2 * x;
+        B(1) -= r2 * y;
+        B(2) -= r2 * z;
+        B(3) -= r2;
+    }
+
+    A(1, 0) = A(0, 1);
+    A(2, 0) = A(0, 2);
+    A(2, 1) = A(1, 2);
+    A(3, 0) = A(0, 3);
+    A(3, 1) = A(1, 3);
+    A(3, 2) = A(2, 3);
+
+    if (!Invert(A)) {
+        logString("Sphere fitting failed: Matrix is not invertible.", true);
+        indicateErrorWithLED("blue");
+        return false;
+    }
+
+    Matrix<4> X = A * B;
+
+    offset.axis.x = -X(0) / 2;
+    offset.axis.y = -X(1) / 2;
+    offset.axis.z = -X(2) / 2;
+
+    float radius = sqrt((X(0) * X(0) + X(1) * X(1) + X(2) * X(2)) / 4 - X(3));
+    if (radius <= 0 || isnan(radius)) {
+        logString("Sphere fitting failed: Invalid radius.", true);
+        indicateErrorWithLED("orange");
+        return false;
+    }
+
+    sensitivity = {
+        1.0f / radius, 0.0f, 0.0f,
+        0.0f, 1.0f / radius, 0.0f,
+        0.0f, 0.0f, 1.0f / radius
+    };
+
+    logString("Sphere fitting successful.", true);
+    logString("Offset: " + FusionVectorToString(offset), true);
+    logString("Sensitivity Matrix: Diagonal Elements", true);
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -269,34 +349,41 @@ void calibrateGyroscope() {
 void calibrateAccelerometer() {
     logString("Calibrating accelerometer... Rotate the device freely.", true);
 
-    float aMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
-    float aMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+    std::vector<FusionVector> accelData;
+    const int totalSamples = 2000;
 
-    for (int i = 0; i < 2000; i++) {
+    for (int i = 0; i < totalSamples; i++) {
         if (IMU.accelAvailable()) {
             IMU.readRawAccel(CaX, CaY, CaZ);
-            CaX *= -1.0; //Invert for goofy imu
-
-            aMin[0] = min(aMin[0], CaX);
-            aMax[0] = max(aMax[0], CaX);
-            aMin[1] = min(aMin[1], CaY);
-            aMax[1] = max(aMax[1], CaY);
-            aMin[2] = min(aMin[2], CaZ);
-            aMax[2] = max(aMax[2], CaZ);
+            CaX *= -1.0; // Invert for sensor alignment
+            accelData.push_back({CaX, CaY, CaZ});
         }
         delay(10);
     }
 
-    calibrationData.accelerometerSensitivity = { 
-        2.0f / (aMax[0] - aMin[0]), 
-        2.0f / (aMax[1] - aMin[1]), 
-        2.0f / (aMax[2] - aMin[2]) 
-    };
-    calibrationData.accelerometerMisalignment = FUSION_IDENTITY_MATRIX; // Default
+    // Fit to sphere for better calibration
+    FusionVector offset = {0, 0, 0};
+    FusionMatrix sensitivityMatrix = FUSION_IDENTITY_MATRIX;
 
-    logString("Accelerometer calibration complete.", true);
-    logString("Sensitivity: ", false);
-    logString(FusionVectorToString(calibrationData.accelerometerSensitivity), true);
+    if (fitSphere(accelData, offset, sensitivityMatrix)) {
+        calibrationData.accelerometerOffset = offset;
+
+        // Extract diagonal elements of the sensitivity matrix
+        calibrationData.accelerometerSensitivity = {
+            sensitivityMatrix.element.xx,
+            sensitivityMatrix.element.yy,
+            sensitivityMatrix.element.zz
+        };
+
+        logString("Accelerometer calibration complete.", true);
+        logString("Offset: " + FusionVectorToString(offset), true);
+        logString("Sensitivity: (" + String(sensitivityMatrix.element.xx, 6) + ", " +
+                  String(sensitivityMatrix.element.yy, 6) + ", " +
+                  String(sensitivityMatrix.element.zz, 6) + ")", true);
+    } else {
+        logString("Accelerometer calibration failed. Using default values.", true);
+        indicateErrorWithLED("red");
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -319,6 +406,7 @@ void collectMagnetometerData() {
         // Check for array bounds
         if (sampleCount >= MAX_MAG_SAMPLES) {
             logString("ERROR: Sample count exceeded maximum!", true);
+            indicateErrorWithLED("blue");
             break;
         }
         
@@ -368,7 +456,6 @@ void collectMagnetometerData() {
                     logString(sampleCount, true);
                     stats.printStats();
                     return;
-                    return;
                 }
             }
         }
@@ -381,6 +468,7 @@ void collectMagnetometerData() {
     logString("WARNING: Calibration ended without completing!", true);
     logString("Samples collected: ", false);
     logString(sampleCount, true);
+    indicateErrorWithLED("red");
     stats.printStats();
 }
 
@@ -492,6 +580,7 @@ bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionM
     if (isnan(offset.axis.x) || isnan(offset.axis.y) || isnan(offset.axis.z) ||
         abs(offset.axis.x) > 100 || abs(offset.axis.y) > 100 || abs(offset.axis.z) > 100) {
         logString("ERROR: Invalid calibration results!", true);
+        indicateErrorWithLED("orange");
         return false;
     }
 
@@ -521,36 +610,25 @@ bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionM
 ///////////////////////////////////////////////////////////////////
 void calibrateMagnetometer() {
     logString("Starting magnetometer calibration...", true);
-    logString("Move the device in all orientations.", true);
-    
+
     collectMagnetometerData();
-    
-    // Only proceed with fitting if we have enough samples
     if (sampleCount >= MIN_MAG_SAMPLES) {
         FusionVector hardIronOffset;
         FusionMatrix softIronMatrix;
-        
+
         if (fitEllipsoid(magData, sampleCount, hardIronOffset, softIronMatrix)) {
             calibrationData.hardIronOffset = hardIronOffset;
             calibrationData.softIronMatrix = softIronMatrix;
-            
+
             logString("Magnetometer calibration successful.", true);
             logString("Hard Iron Offset: " + FusionVectorToString(hardIronOffset), true);
-            logString("Soft Iron Matrix:", true);
-            logString("XX: " + String(softIronMatrix.element.xx, 6) + 
-                     ", YY: " + String(softIronMatrix.element.yy, 6) + 
-                     ", ZZ: " + String(softIronMatrix.element.zz, 6), true);
         } else {
-            logString("ERROR: Ellipsoid fitting failed.", true);
-            // Use default values
-            calibrationData.hardIronOffset = {0.0f, 0.0f, 0.0f};
-            calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX;
+            logString("Ellipsoid fitting failed. Using default values.", true);
+            indicateErrorWithLED("red");
         }
     } else {
-        logString("ERROR: Not enough valid samples collected.", true);
-        // Use default values
-        calibrationData.hardIronOffset = {0.0f, 0.0f, 0.0f};
-        calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX;
+        logString("Insufficient magnetometer samples collected.", true);
+        indicateErrorWithLED("purple");
     }
 }
 

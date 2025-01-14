@@ -11,11 +11,11 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.12f, //0.5 initial default
+        .gain = 0.5f, //0.5 initial default
         .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
-        .accelerationRejection = 10.0f, //10 inital default 
-        .magneticRejection = 150.0f, //10 initial default
-        .recoveryTriggerPeriod = 2500, // 5 seconds initial default - 5000
+        .accelerationRejection = 12.0f, //10 inital default 
+        .magneticRejection = 12.0f, //10 initial default
+        .recoveryTriggerPeriod = 5000, // 5 seconds initial default - 5000
 };
 
 // Initialise algorithms
@@ -170,7 +170,7 @@ void setup() {
         delay(100);
         IMU.setGyroODR(4);
         IMU.setAccelODR(4);
-        IMU.setMagnetODR(6);
+        IMU.setMagnetODR(7);
         delay(100);
         IMU.setContinuousMode();
 

@@ -25,6 +25,7 @@ void checkBattery();
 // General Function Declarations
 void setupPins();
 bool detectShake();
+void indicateErrorWithLED(const String& color);
 void setPowerLedState(bool On);
 void setDataLedState(bool On);
 void setColorLedState(String Color);

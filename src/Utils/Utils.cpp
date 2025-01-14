@@ -23,13 +23,7 @@ const float MAX_BATTERY_VOLTAGE = 4.2; //Maximum voltage of input battery when f
 void updateBatteryLEDs(float batteryVoltage) {
     if (batteryVoltage <= 3.3) {
         // Flash red LED for low battery warning
-        for (int i = 0; i < 3; i++) {
-            setColorLedState("off");
-            delay(250);
-            setColorLedState("red");
-            delay(250);
-        }
-        setColorLedState("off");
+        indicateErrorWithLED("red");
     } else {
         float range = MAX_BATTERY_VOLTAGE - LOW_BATTERY_THRESHOLD;
         float normalized = (batteryVoltage - LOW_BATTERY_THRESHOLD) / range;
@@ -45,6 +39,16 @@ void updateBatteryLEDs(float batteryVoltage) {
             setColorLedState("red");
         }
     }
+}
+
+void indicateErrorWithLED(const String& color) {
+    for (int i = 0; i < 3; i++) {
+        setColorLedState("off");
+        delay(250);
+        setColorLedState(color);
+        delay(250);
+    }
+    setColorLedState("off");
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -75,12 +79,7 @@ void enterLowPowerMode() {
     logString("[WARN] Low battery detected! Entering low power mode...", true);
 
     // Flash the red light 3 times
-    for (int i = 0; i < 3; i++) {
-        setColorLedState("red");
-        delay(250); // Light on for 250ms
-        setColorLedState("off");
-        delay(250); // Light off for 250ms
-    }
+    indicateErrorWithLED("red");
 
     // Turn off LEDs completely
     setColorLedState("off");
