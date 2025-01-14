@@ -9,6 +9,7 @@
 #include <vector>
 #include <numeric>
 
+
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
 #define MIN_MAG_SAMPLES 2500  // Minimum samples needed
