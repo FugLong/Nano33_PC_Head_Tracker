@@ -203,7 +203,7 @@ void loop() {
     while (!Serial && !BLE.central()){
         if (detectShake() && EnableCalibration) {
             logString("Shake detected! Clearing calibration data...", true);
-            setColorLedState("orange");
+            indicateErrorWithLED("orange");
             clearCalibrationData();
             delay(3000); // Add a delay to prevent repeated triggering
             setColorLedState("purple");
