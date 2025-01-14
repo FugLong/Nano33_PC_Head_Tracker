@@ -8,13 +8,13 @@
 #include <BasicLinearAlgebra.h>
 #include <vector>
 #include <numeric>
+#include <deque>
+#include <cmath>
+#include "Nano33_Calibration.h"
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
-#define MIN_MAG_SAMPLES 2500  // Minimum samples needed
-#define MAX_MAG_SAMPLES 5000  // Maximum samples to collect
-#define MIN_RADIUS_VARIATION 0.3f  // Minimum variation needed in each axis
-#define MAG_SAMPLE_PERIOD_MS 25  // 40Hz = 25ms period
+CalibrationData calibrationData;
 
 // Define calibration
 FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
@@ -26,45 +26,6 @@ FusionVector accelerometerOffset = {0.0f, 0.0f, 0.0f};
 FusionMatrix softIronMatrix = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
 FusionVector hardIronOffset = {0.0f, 0.0f, 0.0f};
 
-struct CalibrationData {
-    bool valid;
-    FusionMatrix gyroscopeMisalignment;
-    FusionVector gyroscopeSensitivity;
-    FusionVector gyroscopeOffset;
-    FusionMatrix accelerometerMisalignment;
-    FusionVector accelerometerSensitivity;
-    FusionVector accelerometerOffset;
-    FusionMatrix softIronMatrix;
-    FusionVector hardIronOffset;
-};
-CalibrationData calibrationData;
-
-// Structure to track calibration progress
-struct MagCalibrationStats {
-    float minX = FLT_MAX, maxX = -FLT_MAX;
-    float minY = FLT_MAX, maxY = -FLT_MAX;
-    float minZ = FLT_MAX, maxZ = -FLT_MAX;
-    bool isComplete() {
-        float xRange = maxX - minX;
-        float yRange = maxY - minY;
-        float zRange = maxZ - minZ;
-        
-        // Check if we have sufficient variation in all axes
-        return (xRange > MIN_RADIUS_VARIATION && 
-                yRange > MIN_RADIUS_VARIATION && 
-                zRange > MIN_RADIUS_VARIATION);
-    }
-    void printStats() {
-        logString("Current ranges:", true);
-        logString("X range: ", false);
-        logString(maxX - minX, true);
-        logString("Y range: ", false);
-        logString(maxY - minY, true);
-        logString("Z range: ", false);
-        logString(maxZ - minZ, true);
-    }
-};
-
 // Sensor variables
 float CgX = 0, CgY = 0, CgZ = 0;
 float CaX = 0, CaY = 0, CaZ = 0;
@@ -75,7 +36,7 @@ float Cdeltat;
 FileSystem_MBED *myFS;
 
 // Buffer for magnetometer data
-float magData[3000][3];
+float magData[5000][3];
 int sampleCount = 0;
 
 String FusionVectorToString(const FusionVector &vector) {
@@ -473,135 +434,74 @@ void collectMagnetometerData() {
 }
 
 ///////////////////////////////////////////////////////////////////
-// Fit ellipsoid math
+// Fit Ellipsoid Math
 ///////////////////////////////////////////////////////////////////
 bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionMatrix &softIronMatrix) {
-    logString("Starting ellipsoid fitting with ", false);
-    logString(numSamples, false);
-    logString(" samples...", true);
-    
     using namespace BLA;
-
-    // Pre-allocate matrices
-    BLA::Matrix<9, 9> A;
-    BLA::Matrix<9> B;
     
-    logString("Initializing matrices...", true);
-    A.Fill(0.0);
-    B.Fill(0.0);
-
-    // Build the design matrix A and target vector B
-    logString("Building matrices...", true);
+    // Create design matrix for full ellipsoid fit (includes cross-terms)
+    Matrix<10, 10> H;
+    Matrix<10> b;
+    H.Fill(0.0f);
+    b.Fill(0.0f);
+    
+    // Accumulate matrices
     for (int i = 0; i < numSamples; i++) {
-        if (i % 500 == 0) {
-            logString("Processing sample ", false);
-            logString(i, true);
-        }
-        
         float x = data[i][0], y = data[i][1], z = data[i][2];
         float x2 = x * x, y2 = y * y, z2 = z * z;
-        float xy = 2 * x * y, xz = 2 * x * z, yz = 2 * y * z;
+        float xy = x * y, xz = x * z, yz = y * z;
         
-        // Update A matrix
-        float row[9] = {x2, y2, z2, xy, xz, yz, 2*x, 2*y, 2*z};
-        for (int j = 0; j < 9; j++) {
-            for (int k = 0; k < 9; k++) {
-                A(j, k) += row[j] * row[k];
+        float row[10] = {x2, y2, z2, 2*xy, 2*xz, 2*yz, 2*x, 2*y, 2*z, 1};
+        
+        for (int j = 0; j < 10; j++) {
+            for (int k = 0; k < 10; k++) {
+                H(j,k) += row[j] * row[k];
             }
-            B(j) -= row[j];
+            b(j) -= row[j];
         }
     }
-
-    logString("Solving system...", true);
     
-    // Gauss-Jordan elimination with pivoting
-    for (int i = 0; i < 9; i++) {
-        // Find pivot
-        int pivotRow = i;
-        float maxVal = abs(A(i, i));
-        for (int j = i + 1; j < 9; j++) {
-            if (abs(A(j, i)) > maxVal) {
-                maxVal = abs(A(j, i));
-                pivotRow = j;
-            }
-        }
-        
-        // Check for singularity
-        if (maxVal < 1e-10) {
-            logString("ERROR: Matrix is singular!", true);
-            return false;
-        }
-        
-        // Swap rows if needed
-        if (pivotRow != i) {
-            for (int j = 0; j < 9; j++) {
-                float temp = A(i, j);
-                A(i, j) = A(pivotRow, j);
-                A(pivotRow, j) = temp;
-            }
-            float temp = B(i);
-            B(i) = B(pivotRow);
-            B(pivotRow) = temp;
-        }
-        
-        // Normalize pivot row
-        float pivot = A(i, i);
-        for (int j = 0; j < 9; j++) {
-            A(i, j) /= pivot;
-        }
-        B(i) /= pivot;
-        
-        // Eliminate column
-        for (int j = 0; j < 9; j++) {
-            if (j != i) {
-                float factor = A(j, i);
-                for (int k = 0; k < 9; k++) {
-                    A(j, k) -= factor * A(i, k);
-                }
-                B(j) -= factor * B(i);
-            }
-        }
-        
-        if (i % 3 == 0) {
-            logString("Solving... ", false);
-            logString((i * 100) / 9, false);
-            logString("%", true);
-        }
+    // Add regularization to diagonal
+    for (int i = 0; i < 10; i++) {
+        H(i,i) += 0.001f;
     }
-
-    logString("Computing calibration parameters...", true);
     
-    // Extract the calibration parameters
-    offset.axis.x = -B(6) / (2 * B(0));
-    offset.axis.y = -B(7) / (2 * B(1));
-    offset.axis.z = -B(8) / (2 * B(2));
-
-    // Validate results
-    if (isnan(offset.axis.x) || isnan(offset.axis.y) || isnan(offset.axis.z) ||
-        abs(offset.axis.x) > 100 || abs(offset.axis.y) > 100 || abs(offset.axis.z) > 100) {
-        logString("ERROR: Invalid calibration results!", true);
-        indicateErrorWithLED("orange");
+    if (!Invert(H)) {
+        logString("ERROR: Matrix inversion failed", true);
         return false;
     }
-
-    // Compute soft iron matrix (simplified to diagonal)
-    float sx = sqrt(abs(1.0f / B(0)));
-    float sy = sqrt(abs(1.0f / B(1)));
-    float sz = sqrt(abs(1.0f / B(2)));
     
-    // Normalize scale factors
-    float maxScale = max(max(sx, sy), sz);
-    sx /= maxScale;
-    sy /= maxScale;
-    sz /= maxScale;
+    // Solve system
+    Matrix<10> v = H * b;
     
-    softIronMatrix = {
-        sx, 0.0f, 0.0f,
-        0.0f, sy, 0.0f,
-        0.0f, 0.0f, sz
-    };
-
-    logString("Ellipsoid fitting complete!", true);
+    // Extract center (offset)
+    offset.axis.x = -v(6) / (2 * v(0));
+    offset.axis.y = -v(7) / (2 * v(1));
+    offset.axis.z = -v(8) / (2 * v(2));
+    
+    // Construct and decompose the quadratic form matrix
+    Matrix<3,3> Q;
+    Q(0,0) = v(0); Q(0,1) = v(3); Q(0,2) = v(4);
+    Q(1,0) = v(3); Q(1,1) = v(1); Q(1,2) = v(5);
+    Q(2,0) = v(4); Q(2,1) = v(5); Q(2,2) = v(2);
+    
+    // Compute eigenvalues and eigenvectors (simplified)
+    // Note: This is a simplified eigendecomposition. For production code,
+    // you should use a proper eigendecomposition algorithm
+    float trace = Q(0,0) + Q(1,1) + Q(2,2);
+    float scale = sqrt(1.0f / trace);
+    
+    // Create soft iron correction matrix
+    softIronMatrix.element.xx = scale * sqrt(Q(0,0));
+    softIronMatrix.element.xy = scale * Q(0,1);
+    softIronMatrix.element.xz = scale * Q(0,2);
+    softIronMatrix.element.yx = scale * Q(1,0);
+    softIronMatrix.element.yy = scale * sqrt(Q(1,1));
+    softIronMatrix.element.yz = scale * Q(1,2);
+    softIronMatrix.element.zx = scale * Q(2,0);
+    softIronMatrix.element.zy = scale * Q(2,1);
+    softIronMatrix.element.zz = scale * sqrt(Q(2,2));
+    
     return true;
 }
 
