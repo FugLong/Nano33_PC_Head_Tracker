@@ -1,7 +1,5 @@
 # Arduino Nano 33 PC Head Tracker (WIP)
 
-## UPDATE:
-
 ### Version 2 Update Almost Ready for Release! 🚀
 
 Performance is **fantastic!** The core functionality is ready in the **V2_Update branch**, but documentation, project guides, and 3D models for the wireless version enclosure are still in progress.
@@ -24,10 +22,11 @@ Performance is **fantastic!** The core functionality is ready in the **V2_Update
 ## Contents:
 1. [Introduction](#1-introduction)
 2. [Prerequisites](#2-prerequisites)
-3. [Usage](#3-usage)
-4. [Calibration](#4-calibration)
-5. [Configuring Opentrack](#7-configuring-opentrack)
-6. [LED Indicator Meanings](#8-led-indicator-meanings)
+3. [Assembly](#3-assembly)
+4. [Setup/Calibration](#4-setup-calibration)
+5. [Usage](#5-usage)
+6. [Configuring Opentrack](#6-configuring-opentrack)
+7. [LED Indicator Meanings](#7-led-indicator-meanings)
 
 ---
 
@@ -105,28 +104,86 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 ---
 
-## 7. Configuring Opentrack
+## 3. Assembly
+(Wireless version only)
+Section WIP (obviously)
 
 ### Steps:
-1. Open **Opentrack** and set the **Input Dropdown** to `Hatire Arduino`.
-2. Set your active COM port.
-4. Ensure **DTR is enabled** in the settings menu.
-5. Configure mapping:
-   - *(Optional)* Adjust curves for smoother tracking.
+1. Print da ting
+2. put the tings in da ting
+3. solder up da tings
+4. connect battery and test
+5. put it in the box and put the lid on
 
 ---
 
-## 8. LED Indicator Meanings
+## 4. Setup-Calibration
+
+### Flashing the Arduino:
+1. Open the Nano33 PC Head Tracker app you downloaded above.
+2. Plug your arduino into your PC, the app should update to "Connected".
+3. Press the flash arduino button, it will pull latest and flash the board for you.
+4. Wait till it's done.
+5. This only needs to be done once per update/settings change.
+6. If a new script update is released the UI will notify you that you should reflash.
+
+### First Boot/Calibration:
+1. On first boot (or after calibration data has been cleared) the device will start a calibration sequence. If you need to restart during calibration just press the little reset button on the ardy.
+2. Dark Blue = gyro calibration. Keep the device perfectly still. ~10 sec.
+3. Green = accel calibration. Rotate the device smoothly over all axis ~20 sec.
+4. Flashing Light Blue/Cyan = mag calibration. Move the device in figure-8 patterns to calibrate. ~30 sec.
+5. After the cyan light stops flashing and goes solid this means the calibration is complete and will save to memory. Then the device should automatically restart and go into idle mode (purple LED).
+
+#### ***If the device is acting up and/or you have moved locations you may want to recalibrate. Any time the device is in idle mode you can shake it violently for 5 seconds until the LED flashes yellow/orange. It will then restart and begin the calibration sequence after a few seconds.***
+
+---
+
+## 5. Usage
+(Ensure you have completed Assembly/Setup and the device is attached to your headphones before getting to this point)
+
+### Wired Usage Guide:
+1. Open opentrack
+2. Select the `Hatire Arduino` opentrack plugin as input. (Ensure **DTR is enabled** in settings)
+3. Plug in arduino
+
+### Wireless Usage Guide:
+1. Open the **Nano33 PC Head Tracker app** and start the BLE loop
+2. Power Arduino, it will auto connect to the PC app
+3. Open **opentrack**
+4. Select `UDP Over Network` opentrack plugin as input.
+
+#### Then you're ready to start opentrack tracking and start gaming. Recenter in open track after initial 15 sec or so after the device has initialized.
+
+---
+
+## 6. Configuring Opentrack
+There a a number of things I recommend doing to improve the feel and performance in opentrack. None of this is required, just what I like using.
+
+### Filtering:
+1. I like the `NaturalMovement` filter the best. (update to latest opentrack version if you don't see it)
+2. I turn up rotation responsiveness nearly all the way up, and decrease the deadzones as much as possible
+
+### Curves:
+1. I recommend adding curves very similar to the ones included below. (pics incoming)
+2. This allows for very smooth and non-distracting movement when close to center, while also allowing rotation easily and quickly when you give it more input.
+
+### Output:
+1. For most games, `Freetrack 2.0 Enhanced` will be your best best.
+2. I'd recommend opening the settings and setting "Interface" to `Enable both`.
+
+---
+
+## 7. LED Indicator Meanings
 
 | **Color**            | **State**                               |
 |----------------------|-----------------------------------------|
-| **Red**              | Booting up.                             |
-| **Purple**           | Waiting for connection.                 |
+| **Red**              | Booting up                              |
+| **Purple**           | Waiting for connection                  |
+| **Power LED Green**  | Functioning as intended                 |
 | **Dark Blue**        | Calibrating Gyro, hold still            |
 | **Green**            | Calibrating Accel, rotate smoothly      |
 | **Cyan/Light Blue**  | Calibrating Mag, figure 8               |
-| **Flashing Red**     | Something is going wrong, maybe hardware|
-| **Power LED Green**  | Functioning as intended.                |
-| **Green + Orange**   | Uploading script.                       |
+| **Flashing Red**     | Battery dead or hardware fault          |
+| **Green + Orange**   | Uploading script                        |
 
 ---
