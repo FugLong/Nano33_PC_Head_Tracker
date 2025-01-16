@@ -4,7 +4,7 @@
 
 ### Version 2 Update Almost Ready for Release! 🚀
 
-Performance is **fantastic!** The core functionality is ready in the **V2_Update branch**, but documentation, project plans, and 3D models for the wireless version enclosure are still in progress.
+Performance is **fantastic!** The core functionality is ready in the **V2_Update branch**, but documentation, project guides, and 3D models for the wireless version enclosure are still in progress.
 
 #### Quick Crash Course:
 1. Pull the **V2 branch**.
@@ -65,7 +65,7 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 ### Wired Version Recommendations:
 - **3D Printed Wired Case**: [Get it here.](https://www.thingiverse.com/thing:6111323)
-  - Protects the Arduino and provides a mounting spot.
+  - Protects the Arduino and provides a mounting surface.
 
 ---
 
