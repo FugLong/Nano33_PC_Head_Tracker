@@ -38,7 +38,7 @@ Why spend $150+ when you can build your own for just $25?
 This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, offering:
 - **Great performance**: Low-latency head tracking for gaming.
 - **One-click Arduino flashing**: Easy setup.
-- **Automated calibration**: No manual tuning required.
+- **Automated persistent calibration**: No manual tuning required.
 - **Wireless capability**: Tether-free gaming.
 - **Opentrack integration**: Works with virtually any game.
 
@@ -61,9 +61,8 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 ### Recommended Accessories:
 - **Velcro tape**: For mounting to headphones.
-
-### Wired Version Recommendations:
 - **3D Printed Wired Case**: [Get it here.](https://www.thingiverse.com/thing:6111323)
+  - **Only recommended for wired builds**
   - Protects the Arduino and provides a mounting surface.
 
 ---
@@ -134,7 +133,8 @@ Section WIP (obviously)
 4. Flashing Light Blue/Cyan = mag calibration. Move the device in figure-8 patterns to calibrate. ~30 sec.
 5. After the cyan light stops flashing and goes solid this means the calibration is complete and will save to memory. Then the device should automatically restart and go into idle mode (purple LED).
 
-#### ***If the device is acting up and/or you have moved locations you may want to recalibrate. Any time the device is in idle mode you can shake it violently for 5 seconds until the LED flashes yellow/orange. It will then restart and begin the calibration sequence after a few seconds.***
+### Recalibration:
+***If the device is acting up and/or you have moved locations you may want to recalibrate. Any time the device is in idle mode you can shake it violently for 5 seconds until the LED flashes yellow/orange. It will then restart and begin the calibration sequence after a few seconds.***
 
 ---
 
@@ -152,7 +152,12 @@ Section WIP (obviously)
 3. Open **opentrack**
 4. Select `UDP Over Network` opentrack plugin as input.
 
-#### Then you're ready to start opentrack tracking and start gaming. Recenter in open track after initial 15 sec or so after the device has initialized.
+#### ***Then you're ready to start opentrack tracking and start gaming. Recenter in open track after initial 15 sec or so after the device has initialized.***
+
+### Battery Monitoring Circuit:
+1. If you installed the battery monitoring circuit, you can shake the device once while in idle mode to indicate current battery level.
+2. It will show either green, yellow, red, or flashing red.
+3. If at any time during init or operation the device detects that the battery voltage is below the set safe level, it will flash the red light and power down.
 
 ---
 
