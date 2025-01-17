@@ -61,9 +61,10 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 ### Recommended Accessories:
 - **Velcro tape**: For mounting to headphones.
+  - [This](https://a.co/d/08OIFld) is a cheap option from amazon. You can use anything really
 - **3D Printed Wired Case**: [Get it here.](https://www.thingiverse.com/thing:6111323)
-  - **Only recommended for wired builds**
-  - Protects the Arduino and provides a mounting surface.
+  - ***Only recommended for wired builds***
+  - Protects the Arduino and provides a mounting surface
 
 ---
 
@@ -72,9 +73,8 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 1. **3D Printed Wireless Project Box** *(Link incoming...)*  
    - **IMPORTANT**: Download the **correct mounting plate** for your chosen **booster board** and **Micro Lipo Charger**.  
    - The enclosure includes:
-     - A mounting plate for electronics.
-     - A box with a lid.
-     - A disassembly tool.
+     - A mounting plate for electronics with toggle switch cover
+     - A box with a lid and disassembly tool
 
 2. **Adafruit Micro Lipo Charger**:
    - Choose one of the following:
@@ -90,7 +90,7 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 4. **Lipo Battery**:
    - [Adafruit 400mah Lipo Battery](https://www.adafruit.com/product/3898): $6-$10
-     - Maximum supported battery size: ~36mm x ~17mm x 7.8mm.
+     - Use any battery you want really. Maximum supported battery size: ~36mm x ~17mm x 7.8mm.
      - Ensure it has **over-discharge protection** and/or build the optional **battery monitoring circuit** to avoid damage.
 
 5. **Slide Toggle Switch**: ~$0.50 (SS12D00)
@@ -110,7 +110,7 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 **1. Print yourself (or acquire through dubious means) the following 3d printed parts:**
    1. Enclosure/box and lid 
       - (also includes the disassembly tool)
-   2. Mounting plate for _YOUR SPECIFIC HARDWARE [(Prerequisites)](#2-prerequisites)_ 
+   2. Mounting plate for _YOUR SPECIFIC HARDWARE ([2. Prerequisites](#2-prerequisites))_ 
       - (including the tiny switch cover plate)
 
 **2. Insert electrionics into mounting plate**
