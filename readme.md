@@ -67,7 +67,7 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 
 ---
 
-### Wireless Version Additional Hardware:
+### Wireless Version Required Hardware:
 
 1. **3D Printed Wireless Project Box** *(Link incoming...)*  
    - **IMPORTANT**: Download the **correct mounting plate** for your chosen **booster board** and **Micro Lipo Charger**.  
@@ -104,15 +104,40 @@ This project leverages the **Arduino Nano 33 BLE**, using the **LSM9DS1 IMU**, o
 ---
 
 ## 3. Assembly
-(Wireless version only)
-Section WIP (obviously)
+(Wireless version only) WIP
 
 ### Steps:
-1. Print da ting
-2. put the tings in da ting
-3. solder up da tings
-4. connect battery and test
-5. put it in the box and put the lid on
+**1. Print yourself (or acquire through dubious means) the following 3d printed parts:**
+   1. Enclosure/box and lid 
+      - (also includes the disassembly tool)
+   2. Mounting plate for _YOUR SPECIFIC HARDWARE [(Prerequisites)](#2-prerequisites)_ 
+      - (including the tiny switch cover plate)
+
+**2. Insert electrionics into mounting plate**
+   1. Slide the Arduino into place on the top of the mounting plate
+   2. Slide the charger and booster boards into place on the back side of the mounting plate
+   3. Also place the toggle switch into place and slide the switch cover plate in to lock it in
+
+**3. (Optional) Build the battery monitoring circuit.**
+   1. Yes it's just a voltage reduction circuit so the Arduino doesn't get fried
+   2. Maybe place the parts into the 3d printable jig I haven't made yet, or follow the video that doesn't exist yet to make it by hand?
+
+**4. Wire Everything Up**
+   1. Connect everything as shown in the wiring diagram I haven't digitized yet, or follow along in that video (not yet made)
+
+**5. Plug the battery in and test**
+   1. Flip the switch and make sure the lights turn on.
+   2. If you already flashed the Arduino, give the ble connection a test too.
+
+**6. Finish Assembly**
+   1. Insert the whole package into the enclosure, **ensuring the switch aligns with the gap in the box**.
+   2. Make sure it's aligned perfectly then push it all the way in, press hard.
+   3. To put the lid on, squeeze the tabs and insert the corners into the center of the enclosure.
+   4. Then you can push the lid flat and it should lock into place.
+
+### ***If you need to disassemble it for any reason:***
+   1. Use the tool to pop the lid's tabs by inserting the flat edge into the slots on top and bottom of the box
+   2. Use the edge with 90 degree angles as a key to push the mounting plate out of the box from in between the USB ports.
 
 ---
 
@@ -122,16 +147,18 @@ Section WIP (obviously)
 1. Open the Nano33 PC Head Tracker app you downloaded above.
 2. Plug your arduino into your PC, the app should update to "Connected".
 3. Press the flash arduino button, it will pull latest and flash the board for you.
-4. Wait till it's done.
-5. This only needs to be done once per update/settings change.
-6. If a new script update is released the UI will notify you that you should reflash.
+4. Wait till it's done then you're ready to go.
+   - This only needs to be done once per update/settings change.
+   - If a new script update is released the UI will notify you that you should reflash.
 
 ### First Boot/Calibration:
-1. On first boot (or after calibration data has been cleared) the device will start a calibration sequence. If you need to restart during calibration just press the little reset button on the ardy.
-2. Dark Blue = gyro calibration. Keep the device perfectly still. ~10 sec.
-3. Green = accel calibration. Rotate the device smoothly over all axis ~20 sec.
-4. Flashing Light Blue/Cyan = mag calibration. Move the device in figure-8 patterns to calibrate. ~30 sec.
-5. After the cyan light stops flashing and goes solid this means the calibration is complete and will save to memory. Then the device should automatically restart and go into idle mode (purple LED).
+1. On first boot (or after calibration data has been cleared) the device will start a calibration sequence.
+   - If you need to restart during calibration just press the little reset button on the ardy.
+2. Dark Blue = Gyro calibration. Keep the device **perfectly** still. ~10 sec.
+3. Green = Accel calibration. Rotate the device smoothly over all axis ~20 sec.
+4. Flashing Light Blue/Cyan = Mag calibration. Move the device in figure-8 patterns to calibrate. ~30 sec.
+5. After the cyan light stops flashing and goes solid this means the calibration is complete and will save to memory.
+   - Then the device should automatically restart and go into idle mode (purple LED).
 
 ### Recalibration:
 ***If the device is acting up and/or you have moved locations you may want to recalibrate. Any time the device is in idle mode you can shake it violently for 5 seconds until the LED flashes yellow/orange. It will then restart and begin the calibration sequence after a few seconds.***
