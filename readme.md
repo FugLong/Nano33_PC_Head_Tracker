@@ -1,8 +1,9 @@
-# Arduino Nano 33 PC Head Tracker (WIP)
+# Arduino Nano 33 PC Head Tracker (WIP, Nano 33 REV 1 working)
 
 ### Version 2 Update Almost Ready for Release! 🚀
 
 Performance is **fantastic!** The core functionality is ready in the **V2_Update branch**, but documentation, project guides, and 3D models for the wireless version enclosure are still in progress.
+***Arduino Nano 33 BLE Rev. 2 support coming as well***
 
 #### Quick Crash Course:
 1. Pull the **V2 branch**.
