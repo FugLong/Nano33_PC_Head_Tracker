@@ -141,4 +141,4 @@ class LSM9DS1Class {
     TwoWire* _wire;
 };
 
-extern LSM9DS1Class IMU;
+extern LSM9DS1Class IMU_LSM9DS1;

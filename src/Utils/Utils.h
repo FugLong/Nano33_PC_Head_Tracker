@@ -1,4 +1,5 @@
-#include <Arduino_LSM9DS1.h>
+#include <IMUHandler/IMUHandler.h>
+#include <ArduinoBLE.h>
 
 // LED Pin definitions
 #define PIN_LED     (13u)
@@ -14,6 +15,9 @@
 
 // ENABLE OR DISABLE TEST MODE (dev stuff)
 extern const bool TestMode;
+
+//So this can work on Rev 1 and 2 Nano 33 boards
+extern IMUHandler imuHandler;
 
 // Battery Function Declarations
 void updateBatteryLEDs(float batteryVoltage);

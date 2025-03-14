@@ -2,8 +2,10 @@
 #define NANO33_CALIBRATION_H
 
 #include <FS_Nano33BLE.h>
-#include <Arduino_LSM9DS1.h>
+#include <float.h>
+#include <Utils/Utils.h>
 #include <Fusion/Fusion.h>
+#include <BasicLinearAlgebra.h>
 #include <vector>
 #include <numeric>
 

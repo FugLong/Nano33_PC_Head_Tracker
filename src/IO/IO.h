@@ -3,7 +3,7 @@
 
 #include <Utils/Utils.h>
 #include <ArduinoBLE.h>
-#include <Arduino_LSM9DS1.h>
+#include <LSM9DS1/Arduino_LSM9DS1.h>
 
 // Hatire Data Structure
 struct Hat {

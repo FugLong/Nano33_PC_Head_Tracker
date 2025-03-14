@@ -6,7 +6,10 @@
 
 Arduino_LSM9DS1	KEYWORD1
 LSM9DS1	KEYWORD1
-IMU	KEYWORD1
+IMU_LSM9DS1	KEYWORD1
+
+BoschSensorClass	KEYWORD1
+IMU_BMI270_BMM150	KEYWORD1
 
 #######################################
 # Methods and Functions 

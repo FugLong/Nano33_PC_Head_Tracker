@@ -2,8 +2,6 @@
 * Utilities for the Nano 33 BLE
 */
 
-#include <Arduino_LSM9DS1.h>
-#include <ArduinoBLE.h>
 #include "Utils.h"
 
 //-----------------------Battery Utils----------------------------
@@ -42,7 +40,7 @@ void updateBatteryLEDs(float batteryVoltage) {
 }
 
 void indicateErrorWithLED(const String& color) {
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 6; i++) {
         setColorLedState("off");
         delay(250);
         setColorLedState(color);
@@ -87,7 +85,7 @@ void enterLowPowerMode() {
     setDataLedState(false);
 
     // Disable IMU
-    IMU.end();
+    //IMU.end();
 
     // Disable BLE (ArduinoBLE library specific)
     if (BLE.connected()) {
@@ -126,6 +124,7 @@ void checkBattery() {
 //-----------------------General Utils----------------------------
 
 const bool TestMode = false;
+IMUHandler imuHandler;
 
 ///////////////////////////////////////////////////////////////////
 // Setup pins for LED control and battery monitoring
@@ -249,8 +248,8 @@ bool detectShake() {
     float aX = 0, aY = 0, aZ = 0;
 
     // Read accelerometer values
-    if (IMU.accelAvailable()) {
-        IMU.readRawAccel(aX, aY, aZ);
+    if (imuHandler.accelAvailable()) {
+        imuHandler.readRawAccel(aX, aY, aZ);
 
         // Calculate total G-force
         float totalG = sqrt(aX * aX + aY * aY + aZ * aZ);

@@ -1,20 +1,13 @@
 //Nano33_Calibration.cpp
 
-#include <FS_Nano33BLE.h>
-#include <float.h>
-#include <Arduino_LSM9DS1.h>
-#include <Utils/Utils.h>
-#include <Fusion/Fusion.h>
-#include <BasicLinearAlgebra.h>
-#include <vector>
-#include <numeric>
+#include "Nano33_Calibration.h"
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
-#define MIN_MAG_SAMPLES 2500  // Minimum samples needed
-#define MAX_MAG_SAMPLES 5000  // Maximum samples to collect
-#define MIN_RADIUS_VARIATION 0.3f  // Minimum variation needed in each axis
-#define MAG_SAMPLE_PERIOD_MS 25  // 40Hz = 25ms period
+#define MIN_MAG_SAMPLES 1000     // Increased from 500 for better statistical significance
+#define MAX_MAG_SAMPLES 2000     // Increased from 1000
+#define MIN_RADIUS_VARIATION 0.4f // Increased from 0.3 for better calibration quality
+#define MAG_SAMPLE_PERIOD_MS 50   // Slowed from 100 for more stable readings
 
 // Define calibration
 FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
@@ -26,17 +19,6 @@ FusionVector accelerometerOffset = {0.0f, 0.0f, 0.0f};
 FusionMatrix softIronMatrix = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
 FusionVector hardIronOffset = {0.0f, 0.0f, 0.0f};
 
-struct CalibrationData {
-    bool valid;
-    FusionMatrix gyroscopeMisalignment;
-    FusionVector gyroscopeSensitivity;
-    FusionVector gyroscopeOffset;
-    FusionMatrix accelerometerMisalignment;
-    FusionVector accelerometerSensitivity;
-    FusionVector accelerometerOffset;
-    FusionMatrix softIronMatrix;
-    FusionVector hardIronOffset;
-};
 CalibrationData calibrationData;
 
 // Structure to track calibration progress
@@ -75,7 +57,7 @@ float Cdeltat;
 FileSystem_MBED *myFS;
 
 // Buffer for magnetometer data
-float magData[3000][3];
+float magData[1000][3];
 int sampleCount = 0;
 
 String FusionVectorToString(const FusionVector &vector) {
@@ -245,17 +227,16 @@ void calibrateGyroscope() {
     logString("Starting gyroscope calibration... Ensure device is stationary.", true);
 
     std::vector<float> gXReadings, gYReadings, gZReadings;
-    const int totalSamples = 500;
+    const int totalSamples = 1000;  // Increased from 500 for better averaging
 
     for (int i = 0; i < totalSamples; i++) {
-        if (IMU.gyroAvailable()) {
-            IMU.readRawGyro(CgX, CgY, CgZ);
-            CgX *= -1.0; // Invert for sensor alignment
+        if (imuHandler.gyroAvailable()) {
+            imuHandler.readRawGyro(CgX, CgY, CgZ);
             gXReadings.push_back(CgX);
             gYReadings.push_back(CgY);
             gZReadings.push_back(CgZ);
         }
-        delay(10);
+        delay(5);  // Reduced from 10 to get more frequent samples
     }
 
     auto mean = [](const std::vector<float>& data) {
@@ -353,9 +334,8 @@ void calibrateAccelerometer() {
     const int totalSamples = 2000;
 
     for (int i = 0; i < totalSamples; i++) {
-        if (IMU.accelAvailable()) {
-            IMU.readRawAccel(CaX, CaY, CaZ);
-            CaX *= -1.0; // Invert for sensor alignment
+        if (imuHandler.accelAvailable()) {
+            imuHandler.readRawAccel(CaX, CaY, CaZ);
             accelData.push_back({CaX, CaY, CaZ});
         }
         delay(10);
@@ -427,9 +407,9 @@ void collectMagnetometerData() {
         
         // Collect samples at 40Hz
         if (currentTime - lastSampleTime >= MAG_SAMPLE_PERIOD_MS) {
-            if (IMU.magneticFieldAvailable()) {
+            if (imuHandler.magnetAvailable()) {
                 float x, y, z;
-                IMU.readRawMagnet(x, y, z);
+                imuHandler.readRawMagnet(x, y, z);
                 
                 // Update min/max values
                 stats.minX = min(stats.minX, x);

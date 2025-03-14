@@ -1,5 +1,4 @@
 #include <Calibration/Nano33_Calibration.h>
-#include <Arduino_LSM9DS1.h>
 #include <Fusion/Fusion.h>
 #include <Utils/Utils.h>
 #include <IO/IO.h>
@@ -11,11 +10,11 @@ const bool EnableCalibration = true;
 // Set AHRS algorithm settings | TWEAK THE SETTINGS HERE TO CONTROL HOW THE TRACKING FEELS/BEHAVES
 const FusionAhrsSettings settings = {
         .convention = FusionConventionNwu,
-        .gain = 0.333f, //0.5 initial default
-        .gyroscopeRange = 2000.0f, // gyroscope range in degrees/s
-        .accelerationRejection = 12.0f, //10 inital default 
-        .magneticRejection = 12.0f, //10 initial default
-        .recoveryTriggerPeriod = 5000, // 5 seconds initial default - 5000
+        .gain = 0.15f,
+        .gyroscopeRange = 2000.0f,
+        .accelerationRejection = 15.0f,
+        .magneticRejection = 15.0f,
+        .recoveryTriggerPeriod = 7500,
 };
 
 // Initialise algorithms
@@ -30,12 +29,12 @@ float deltat;
 
 //Timing Code
 unsigned long loopCounter = 0;
-const long RequiredMicros = 5000;
+const long RequiredMicros = 5000;  // 200Hz to match working code
 unsigned long previousMicros = 0;
 unsigned long previousSecond = 0;
 
 // IMU Sample Rate for Fusion AHRS
-#define SAMPLE_RATE (200)
+#define SAMPLE_RATE (200)  // Match working code
 
 ///////////////////////////////////////////////////////////////////
 // Sensor Fusion Init and Config
@@ -74,19 +73,7 @@ void setupFusion(){
 // Update angles from IMU
 ///////////////////////////////////////////////////////////////////
 void updateAngles() {
-    if (IMU.gyroAvailable()) {
-        IMU.readRawGyro(gX, gY, gZ);
-        gX *= -1.0; // flip X axis
-    }
-
-    if (IMU.accelAvailable()) {
-        IMU.readRawAccel(aX, aY, aZ);
-        aX *= -1.0; // Flip X-axis to match orientation
-    }
-
-    if (IMU.magneticFieldAvailable()) {
-        IMU.readRawMagnet(mX, mY, mZ);
-    }
+    imuHandler.readIMU(gX, gY, gZ, aX, aY, aZ, mX, mY, mZ);
 
     const clock_t timestamp = clock(); // replace this with actual gyroscope timestamp
     FusionVector gyroscope = {gX, gY, gZ}; // in degrees/s
@@ -124,12 +111,18 @@ void updateAngles() {
             //Print the header only once
             static bool headerPrinted = false;
             if (!headerPrinted) {
-                logString("   Pitch      Roll       Yaw", true);
-                logString("-------------------------------", true);
+                logString("   Mag X      Mag Y      Mag Z     Pitch      Roll       Yaw", true);
+                logString("-----------------------------------------------------------", true);
                 headerPrinted = true;
             }
 
-            // Print the Euler angles in columns
+            // Print the magnetometer and Euler angles in columns
+            logString("    ", false);
+            logString(mX, false);
+            logString("    ", false);
+            logString(mY, false);
+            logString("    ", false);
+            logString(mZ, false);
             logString("    ", false);
             logString(euler.angle.pitch, false);
             logString("    ", false);
@@ -138,9 +131,15 @@ void updateAngles() {
             logString(euler.angle.yaw, true);
         }
     } else {
-        hat.gyro[0] = -euler.angle.yaw; //Yaw
-        hat.gyro[1] = euler.angle.pitch; //Actually Roll
-        hat.gyro[2] = -euler.angle.roll; //Actually Pitch
+        if (imuHandler.getRevision() == IMUHandler::Rev1) {
+            hat.gyro[0] = -euler.angle.yaw;    // Yaw
+            hat.gyro[1] = euler.angle.pitch;   // Pitch
+            hat.gyro[2] = -euler.angle.roll;   // Roll
+        } else { // Rev2
+            hat.gyro[0] = -euler.angle.yaw;    // Yaw
+            hat.gyro[1] = euler.angle.roll;    // Pitch (swapped for Rev2)
+            hat.gyro[2] = -euler.angle.pitch;  // Roll (swapped for Rev2)
+        }
         sendAnglesToHatire();
     }
 }
@@ -165,14 +164,8 @@ void setup() {
     //Init filesystem for calibration data loading and saving
     initFS();
 
-    if (IMU.begin() && myFS->init()) {
-        logString("LSM9DS1 IMU Connected.", true);
-        delay(100);
-        IMU.setGyroODR(4);
-        IMU.setAccelODR(4);
-        IMU.setMagnetODR(7);
-        delay(100);
-        IMU.setContinuousMode();
+    if (imuHandler.begin() && myFS->init()) {
+        logString("IMU Connected.", true);
 
         //IO Init
         initIO();
@@ -180,12 +173,12 @@ void setup() {
         setupFusion();
         delay(250);
     } else {
-        if (!IMU.begin()){
+        if (!imuHandler.begin()){
           logString("Failed to initialize IMU!", true);
         } else {
           logString("Failed to initialize FileSystem!", true);
         }
-        digitalWrite(BLUE, HIGH);
+        setColorLedState("off");
         while (true) {
             setColorLedState("off");
             delay(500);
