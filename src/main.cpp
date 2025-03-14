@@ -131,15 +131,10 @@ void updateAngles() {
             logString(euler.angle.yaw, true);
         }
     } else {
-        if (imuHandler.getRevision() == IMUHandler::Rev1) {
-            hat.gyro[0] = -euler.angle.yaw;    // Yaw
-            hat.gyro[1] = euler.angle.pitch;   // Pitch
-            hat.gyro[2] = -euler.angle.roll;   // Roll
-        } else { // Rev2
-            hat.gyro[0] = -euler.angle.yaw;    // Yaw
-            hat.gyro[1] = euler.angle.roll;    // Pitch (swapped for Rev2)
-            hat.gyro[2] = -euler.angle.pitch;  // Roll (swapped for Rev2)
-        }
+        // Both revisions now behave the same way
+        hat.gyro[0] = -euler.angle.yaw;    // Yaw
+        hat.gyro[1] = euler.angle.pitch;   // Pitch
+        hat.gyro[2] = -euler.angle.roll;   // Roll
         sendAnglesToHatire();
     }
 }
