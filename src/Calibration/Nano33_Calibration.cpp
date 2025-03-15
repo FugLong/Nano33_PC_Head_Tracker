@@ -4,10 +4,21 @@
 
 #define CALIBRATION_FILE MBED_FS_FILE_PREFIX "/calibration.dat"
 
-#define MIN_MAG_SAMPLES 1000     // Increased from 500 for better statistical significance
-#define MAX_MAG_SAMPLES 2000     // Increased from 1000
-#define MIN_RADIUS_VARIATION 0.4f // Increased from 0.3 for better calibration quality
-#define MAG_SAMPLE_PERIOD_MS 50   // Slowed from 100 for more stable readings
+#define MIN_MAG_SAMPLES 300      // Keep minimum samples
+#define MAX_MAG_SAMPLES 600      // Keep maximum samples
+#define MIN_RADIUS_VARIATION 0.25f // Slightly more sensitive
+#define MAG_SAMPLE_PERIOD_MS 20   // Back to original faster rate
+#define GYRO_SAMPLES 500         // Reduced - just need basic offset
+#define GYRO_STABILITY_THRESHOLD 0.02f  // For offset calculation
+#define ACCEL_SAMPLES_PER_ORIENTATION 100  // Reduced from 200 for faster calibration
+#define ACCEL_NUM_STABLE_READINGS 50    // Number of stable readings needed
+#define ACCEL_GRAVITY_THRESHOLD 0.1f    // 0.1G threshold for gravity detection
+#define ACCEL_STABILITY_THRESHOLD 0.05f  // 0.05G threshold for stability
+#define GRAVITY_REFERENCE 1.0f         // 1G reference (not 9.81 m/s²)
+#define CALIBRATION_TIMEOUT_MS 30000 // 30 second timeout
+#define MOVING_AVERAGE_SAMPLES 10       // Number of samples for moving average
+#define VARIANCE_CHECK_SAMPLES 20       // Samples to check for variance
+#define MIN_SAMPLES_PER_SECTOR 10       // Even more lenient per sector
 
 // Define calibration
 FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
@@ -22,30 +33,148 @@ FusionVector hardIronOffset = {0.0f, 0.0f, 0.0f};
 CalibrationData calibrationData;
 
 // Structure to track calibration progress
+struct CalibrationProgress {
+    int totalSteps;
+    int currentStep;
+    const char* currentStage;
+    float percentComplete;
+    
+    void update(int step, const char* stage, float percent) {
+        currentStep = step;
+        currentStage = stage;
+        percentComplete = percent;
+        reportProgress();
+    }
+    
+    void reportProgress() {
+        logString("Calibration Progress: Stage ", false);
+        logString(currentStep, false);
+        logString("/", false);
+        logString(totalSteps, false);
+        logString(" - ", false);
+        logString(currentStage, false);
+        logString(" (", false);
+        logString(percentComplete, false);
+        logString("%)", true);
+    }
+};
+
+// Structure to track magnetometer calibration stats
 struct MagCalibrationStats {
     float minX = FLT_MAX, maxX = -FLT_MAX;
     float minY = FLT_MAX, maxY = -FLT_MAX;
     float minZ = FLT_MAX, maxZ = -FLT_MAX;
-    bool isComplete() {
+    
+    // Track samples in different spatial sectors
+    int sectorSamples[8] = {0}; // 8 sectors (octants) of 3D space
+    float lastX = 0, lastY = 0, lastZ = 0; // Track last sample for movement detection
+    bool firstSample = true;
+    
+    int getSector(float x, float y, float z) {
+        // Normalize values relative to current min/max
+        float nx = (x - minX) / (maxX - minX + 0.0001f);
+        float ny = (y - minY) / (maxY - minY + 0.0001f);
+        float nz = (z - minZ) / (maxZ - minZ + 0.0001f);
+        
+        int sector = 0;
+        if (nx > 0.5f) sector |= 1;
+        if (ny > 0.5f) sector |= 2;
+        if (nz > 0.5f) sector |= 4;
+        return sector;
+    }
+    
+    bool isMoving(float x, float y, float z) {
+        if (firstSample) {
+            firstSample = false;
+            lastX = x;
+            lastY = y;
+            lastZ = z;
+            return false;
+        }
+        
+        float dx = x - lastX;
+        float dy = y - lastY;
+        float dz = z - lastZ;
+        
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        
+        // Calculate movement magnitude - reduced threshold for more sensitivity
+        float movement = sqrt(dx*dx + dy*dy + dz*dz);
+        return movement > 0.01f; // More sensitive movement detection
+    }
+    
+    void addSample(float x, float y, float z) {
+        // Update min/max regardless of movement to track full range
+        minX = min(minX, x);
+        maxX = max(maxX, x);
+        minY = min(minY, y);
+        maxY = max(maxY, y);
+        minZ = min(minZ, z);
+        maxZ = max(maxZ, z);
+        
+        // Only increment sector counts if moving
+        if (isMoving(x, y, z)) {
+            int sector = getSector(x, y, z);
+            sectorSamples[sector]++;
+        }
+    }
+    
+    bool hasGoodCoverage() {
+        // Check basic range requirements
+        float xRange = maxX - minX;
+        float yRange = maxY - minY;
+        float zRange = maxZ - minZ;
+        bool rangeOK = (xRange > MIN_RADIUS_VARIATION && 
+                       yRange > MIN_RADIUS_VARIATION && 
+                       zRange > MIN_RADIUS_VARIATION);
+        
+        // Check sector coverage - require at least 4 sectors with minimum samples
+        int goodSectors = 0;
+        for (int i = 0; i < 8; i++) {
+            if (sectorSamples[i] >= MIN_SAMPLES_PER_SECTOR) {
+                goodSectors++;
+            }
+        }
+        
+        return rangeOK && (goodSectors >= 4);
+    }
+    
+    float getCoverage() {
+        // Count sectors that meet minimum samples
+        int goodSectors = 0;
+        int totalSamples = 0;
+        
+        for (int i = 0; i < 8; i++) {
+            totalSamples += sectorSamples[i];
+            if (sectorSamples[i] >= MIN_SAMPLES_PER_SECTOR) {
+                goodSectors++;
+            }
+        }
+        
+        // Calculate range coverage
         float xRange = maxX - minX;
         float yRange = maxY - minY;
         float zRange = maxZ - minZ;
         
-        // Check if we have sufficient variation in all axes
-        return (xRange > MIN_RADIUS_VARIATION && 
-                yRange > MIN_RADIUS_VARIATION && 
-                zRange > MIN_RADIUS_VARIATION);
-    }
-    void printStats() {
-        logString("Current ranges:", true);
-        logString("X range: ", false);
-        logString(maxX - minX, true);
-        logString("Y range: ", false);
-        logString(maxY - minY, true);
-        logString("Z range: ", false);
-        logString(maxZ - minZ, true);
+        // More gradual range coverage calculation
+        float rangeCoverage = (
+            (xRange / MIN_RADIUS_VARIATION) + 
+            (yRange / MIN_RADIUS_VARIATION) + 
+            (zRange / MIN_RADIUS_VARIATION)
+        ) / 3.0f;
+        
+        // Combine sector and range coverage with early feedback
+        float sectorCoverage = goodSectors / 4.0f; // Need 4 sectors for good coverage
+        float totalCoverage = (rangeCoverage + sectorCoverage) / 2.0f;
+        
+        // Start showing cyan earlier but still require full coverage for completion
+        return min(1.0f, totalCoverage);
     }
 };
+
+CalibrationProgress progress = {3, 0, "", 0.0f}; // 3 stages: gyro, accel, mag
 
 // Sensor variables
 float CgX = 0, CgY = 0, CgZ = 0;
@@ -221,419 +350,262 @@ bool loadCalibrationData() {
 }
 
 ///////////////////////////////////////////////////////////////////
-// Gyro Calibration
-///////////////////////////////////////////////////////////////////
-void calibrateGyroscope() {
-    logString("Starting gyroscope calibration... Ensure device is stationary.", true);
-
-    std::vector<float> gXReadings, gYReadings, gZReadings;
-    const int totalSamples = 1000;  // Increased from 500 for better averaging
-
-    for (int i = 0; i < totalSamples; i++) {
-        if (imuHandler.gyroAvailable()) {
-            imuHandler.readRawGyro(CgX, CgY, CgZ);
-            gXReadings.push_back(CgX);
-            gYReadings.push_back(CgY);
-            gZReadings.push_back(CgZ);
-        }
-        delay(5);  // Reduced from 10 to get more frequent samples
-    }
-
-    auto mean = [](const std::vector<float>& data) {
-        return std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
-    };
-
-    calibrationData.gyroscopeOffset = {
-        mean(gXReadings),
-        mean(gYReadings),
-        mean(gZReadings)
-    };
-
-    calibrationData.gyroscopeSensitivity = {1.0f, 1.0f, 1.0f}; // Default sensitivity
-    logString("Gyroscope calibration complete.", true);
-    logString("Offsets: ", false);
-    logString(FusionVectorToString(calibrationData.gyroscopeOffset), true);
-}
-
-///////////////////////////////////////////////////////////////////
-// Sphere Fitting for Accelerometer Calibration
-///////////////////////////////////////////////////////////////////
-bool fitSphere(const std::vector<FusionVector>& data, FusionVector& offset, FusionMatrix& sensitivity) {
-    logString("Starting sphere fitting for accelerometer...", true);
-
-    using namespace BLA;
-    Matrix<4, 4> A = Zeros<4, 4>();
-    Matrix<4> B = Zeros<4>();
-
-    for (const auto& point : data) {
-        float x = point.axis.x, y = point.axis.y, z = point.axis.z;
-        float r2 = x * x + y * y + z * z;
-
-        A(0, 0) += x * x;
-        A(0, 1) += x * y;
-        A(0, 2) += x * z;
-        A(0, 3) += x;
-        A(1, 1) += y * y;
-        A(1, 2) += y * z;
-        A(1, 3) += y;
-        A(2, 2) += z * z;
-        A(2, 3) += z;
-        A(3, 3) += 1;
-
-        B(0) -= r2 * x;
-        B(1) -= r2 * y;
-        B(2) -= r2 * z;
-        B(3) -= r2;
-    }
-
-    A(1, 0) = A(0, 1);
-    A(2, 0) = A(0, 2);
-    A(2, 1) = A(1, 2);
-    A(3, 0) = A(0, 3);
-    A(3, 1) = A(1, 3);
-    A(3, 2) = A(2, 3);
-
-    if (!Invert(A)) {
-        logString("Sphere fitting failed: Matrix is not invertible.", true);
-        indicateErrorWithLED("blue");
-        return false;
-    }
-
-    Matrix<4> X = A * B;
-
-    offset.axis.x = -X(0) / 2;
-    offset.axis.y = -X(1) / 2;
-    offset.axis.z = -X(2) / 2;
-
-    float radius = sqrt((X(0) * X(0) + X(1) * X(1) + X(2) * X(2)) / 4 - X(3));
-    if (radius <= 0 || isnan(radius)) {
-        logString("Sphere fitting failed: Invalid radius.", true);
-        indicateErrorWithLED("orange");
-        return false;
-    }
-
-    sensitivity = {
-        1.0f / radius, 0.0f, 0.0f,
-        0.0f, 1.0f / radius, 0.0f,
-        0.0f, 0.0f, 1.0f / radius
-    };
-
-    logString("Sphere fitting successful.", true);
-    logString("Offset: " + FusionVectorToString(offset), true);
-    logString("Sensitivity Matrix: Diagonal Elements", true);
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////
-// Accelerometer Calibration
-///////////////////////////////////////////////////////////////////
-void calibrateAccelerometer() {
-    logString("Calibrating accelerometer... Rotate the device freely.", true);
-
-    std::vector<FusionVector> accelData;
-    const int totalSamples = 2000;
-
-    for (int i = 0; i < totalSamples; i++) {
-        if (imuHandler.accelAvailable()) {
-            imuHandler.readRawAccel(CaX, CaY, CaZ);
-            accelData.push_back({CaX, CaY, CaZ});
-        }
-        delay(10);
-    }
-
-    // Fit to sphere for better calibration
-    FusionVector offset = {0, 0, 0};
-    FusionMatrix sensitivityMatrix = FUSION_IDENTITY_MATRIX;
-
-    if (fitSphere(accelData, offset, sensitivityMatrix)) {
-        calibrationData.accelerometerOffset = offset;
-
-        // Extract diagonal elements of the sensitivity matrix
-        calibrationData.accelerometerSensitivity = {
-            sensitivityMatrix.element.xx,
-            sensitivityMatrix.element.yy,
-            sensitivityMatrix.element.zz
-        };
-
-        logString("Accelerometer calibration complete.", true);
-        logString("Offset: " + FusionVectorToString(offset), true);
-        logString("Sensitivity: (" + String(sensitivityMatrix.element.xx, 6) + ", " +
-                  String(sensitivityMatrix.element.yy, 6) + ", " +
-                  String(sensitivityMatrix.element.zz, 6) + ")", true);
-    } else {
-        logString("Accelerometer calibration failed. Using default values.", true);
-        indicateErrorWithLED("red");
-    }
-}
-
-///////////////////////////////////////////////////////////////////
-// Magnetometer Data Collection
-///////////////////////////////////////////////////////////////////
-void collectMagnetometerData() {
-    MagCalibrationStats stats;
-    sampleCount = 0;
-    unsigned long lastSampleTime = 0;
-    unsigned long lastLedUpdate = 0;
-    unsigned long lastStatusUpdate = 0;
-    bool ledState = false;
-    
-    logString("Begin magnetometer calibration...", true);
-    logString("Move device in figure-8 pattern until LED stays solid", true);
-    
-    while (sampleCount < MAX_MAG_SAMPLES) {
-        unsigned long currentTime = millis();
-        
-        // Check for array bounds
-        if (sampleCount >= MAX_MAG_SAMPLES) {
-            logString("ERROR: Sample count exceeded maximum!", true);
-            indicateErrorWithLED("blue");
-            break;
-        }
-        
-        // Update LED every 100ms
-        if (currentTime - lastLedUpdate >= 100) {
-            ledState = !ledState;
-            setColorLedState(ledState ? "cyan" : "off");
-            lastLedUpdate = currentTime;
-        }
-        
-        // Print status every second
-        if (currentTime - lastStatusUpdate >= 1000) {
-            logString("Samples collected: ", false);
-            logString(sampleCount, true);
-            stats.printStats();
-            lastStatusUpdate = currentTime;
-        }
-        
-        // Collect samples at 40Hz
-        if (currentTime - lastSampleTime >= MAG_SAMPLE_PERIOD_MS) {
-            if (imuHandler.magnetAvailable()) {
-                float x, y, z;
-                imuHandler.readRawMagnet(x, y, z);
-                
-                // Update min/max values
-                stats.minX = min(stats.minX, x);
-                stats.maxX = max(stats.maxX, x);
-                stats.minY = min(stats.minY, y);
-                stats.maxY = max(stats.maxY, y);
-                stats.minZ = min(stats.minZ, z);
-                stats.maxZ = max(stats.maxZ, z);
-                
-                // Store the sample
-                magData[sampleCount][0] = x;
-                magData[sampleCount][1] = y;
-                magData[sampleCount][2] = z;
-                sampleCount++;
-                
-                lastSampleTime = currentTime;
-                
-                // Check if we have enough good samples and sufficient variation
-                if (sampleCount >= MIN_MAG_SAMPLES && stats.isComplete()) {
-                    setColorLedState("cyan");  // Solid cyan indicates completion
-                    delay(50);
-                    logString("Sufficient magnetometer data collected.", true);
-                    logString("Final sample count: ", false);
-                    logString(sampleCount, true);
-                    stats.printStats();
-                    return;
-                }
-            }
-        }
-        
-        // Small delay to prevent tight-looping
-        delay(1);
-    }
-    
-    // If we exit the loop without completing calibration
-    logString("WARNING: Calibration ended without completing!", true);
-    logString("Samples collected: ", false);
-    logString(sampleCount, true);
-    indicateErrorWithLED("red");
-    stats.printStats();
-}
-
-///////////////////////////////////////////////////////////////////
-// Fit ellipsoid math
-///////////////////////////////////////////////////////////////////
-bool fitEllipsoid(float data[][3], int numSamples, FusionVector &offset, FusionMatrix &softIronMatrix) {
-    logString("Starting ellipsoid fitting with ", false);
-    logString(numSamples, false);
-    logString(" samples...", true);
-    
-    using namespace BLA;
-
-    // Pre-allocate matrices
-    BLA::Matrix<9, 9> A;
-    BLA::Matrix<9> B;
-    
-    logString("Initializing matrices...", true);
-    A.Fill(0.0);
-    B.Fill(0.0);
-
-    // Build the design matrix A and target vector B
-    logString("Building matrices...", true);
-    for (int i = 0; i < numSamples; i++) {
-        if (i % 500 == 0) {
-            logString("Processing sample ", false);
-            logString(i, true);
-        }
-        
-        float x = data[i][0], y = data[i][1], z = data[i][2];
-        float x2 = x * x, y2 = y * y, z2 = z * z;
-        float xy = 2 * x * y, xz = 2 * x * z, yz = 2 * y * z;
-        
-        // Update A matrix
-        float row[9] = {x2, y2, z2, xy, xz, yz, 2*x, 2*y, 2*z};
-        for (int j = 0; j < 9; j++) {
-            for (int k = 0; k < 9; k++) {
-                A(j, k) += row[j] * row[k];
-            }
-            B(j) -= row[j];
-        }
-    }
-
-    logString("Solving system...", true);
-    
-    // Gauss-Jordan elimination with pivoting
-    for (int i = 0; i < 9; i++) {
-        // Find pivot
-        int pivotRow = i;
-        float maxVal = abs(A(i, i));
-        for (int j = i + 1; j < 9; j++) {
-            if (abs(A(j, i)) > maxVal) {
-                maxVal = abs(A(j, i));
-                pivotRow = j;
-            }
-        }
-        
-        // Check for singularity
-        if (maxVal < 1e-10) {
-            logString("ERROR: Matrix is singular!", true);
-            return false;
-        }
-        
-        // Swap rows if needed
-        if (pivotRow != i) {
-            for (int j = 0; j < 9; j++) {
-                float temp = A(i, j);
-                A(i, j) = A(pivotRow, j);
-                A(pivotRow, j) = temp;
-            }
-            float temp = B(i);
-            B(i) = B(pivotRow);
-            B(pivotRow) = temp;
-        }
-        
-        // Normalize pivot row
-        float pivot = A(i, i);
-        for (int j = 0; j < 9; j++) {
-            A(i, j) /= pivot;
-        }
-        B(i) /= pivot;
-        
-        // Eliminate column
-        for (int j = 0; j < 9; j++) {
-            if (j != i) {
-                float factor = A(j, i);
-                for (int k = 0; k < 9; k++) {
-                    A(j, k) -= factor * A(i, k);
-                }
-                B(j) -= factor * B(i);
-            }
-        }
-        
-        if (i % 3 == 0) {
-            logString("Solving... ", false);
-            logString((i * 100) / 9, false);
-            logString("%", true);
-        }
-    }
-
-    logString("Computing calibration parameters...", true);
-    
-    // Extract the calibration parameters
-    offset.axis.x = -B(6) / (2 * B(0));
-    offset.axis.y = -B(7) / (2 * B(1));
-    offset.axis.z = -B(8) / (2 * B(2));
-
-    // Validate results
-    if (isnan(offset.axis.x) || isnan(offset.axis.y) || isnan(offset.axis.z) ||
-        abs(offset.axis.x) > 100 || abs(offset.axis.y) > 100 || abs(offset.axis.z) > 100) {
-        logString("ERROR: Invalid calibration results!", true);
-        indicateErrorWithLED("orange");
-        return false;
-    }
-
-    // Compute soft iron matrix (simplified to diagonal)
-    float sx = sqrt(abs(1.0f / B(0)));
-    float sy = sqrt(abs(1.0f / B(1)));
-    float sz = sqrt(abs(1.0f / B(2)));
-    
-    // Normalize scale factors
-    float maxScale = max(max(sx, sy), sz);
-    sx /= maxScale;
-    sy /= maxScale;
-    sz /= maxScale;
-    
-    softIronMatrix = {
-        sx, 0.0f, 0.0f,
-        0.0f, sy, 0.0f,
-        0.0f, 0.0f, sz
-    };
-
-    logString("Ellipsoid fitting complete!", true);
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////
-// Magnetometer Calibration
+// Magnetometer Calibration - Main focus, more robust
 ///////////////////////////////////////////////////////////////////
 void calibrateMagnetometer() {
-    logString("Starting magnetometer calibration...", true);
-
-    collectMagnetometerData();
-    if (sampleCount >= MIN_MAG_SAMPLES) {
-        FusionVector hardIronOffset;
-        FusionMatrix softIronMatrix;
-
-        if (fitEllipsoid(magData, sampleCount, hardIronOffset, softIronMatrix)) {
-            calibrationData.hardIronOffset = hardIronOffset;
-            calibrationData.softIronMatrix = softIronMatrix;
-
-            logString("Magnetometer calibration successful.", true);
-            logString("Hard Iron Offset: " + FusionVectorToString(hardIronOffset), true);
-        } else {
-            logString("Ellipsoid fitting failed. Using default values.", true);
-            indicateErrorWithLED("red");
+    bool calibrationSuccess = false;
+    FusionVector minValues = {FLT_MAX, FLT_MAX, FLT_MAX};
+    FusionVector maxValues = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+    MagCalibrationStats stats;
+    int samples = 0;
+    unsigned long startTime = millis();
+    bool ledState = true;
+    unsigned long lastLedUpdate = 0;
+    
+    // Arrays to store samples for correlation analysis
+    float magX[MAX_MAG_SAMPLES] = {0};
+    float magY[MAX_MAG_SAMPLES] = {0};
+    float magZ[MAX_MAG_SAMPLES] = {0};
+    
+    while (samples < MAX_MAG_SAMPLES && (millis() - startTime) < CALIBRATION_TIMEOUT_MS) {
+        if (imuHandler.magnetAvailable()) {
+            float mx, my, mz;
+            imuHandler.readRawMagnet(mx, my, mz);
+            
+            // Store samples for correlation analysis
+            if (samples < MAX_MAG_SAMPLES) {
+                magX[samples] = mx;
+                magY[samples] = my;
+                magZ[samples] = mz;
+            }
+            
+            // Update stats and increment samples
+            stats.addSample(mx, my, mz);
+            samples++;
+            
+            // Update LED based on coverage - more responsive feedback
+            if (millis() - lastLedUpdate > 100) { // Faster LED updates
+                float coverage = stats.getCoverage();
+                if (coverage >= 0.8f) { // Show cyan earlier
+                    setColorLedState("cyan"); // Solid cyan when getting close
+                } else if (coverage >= 0.4f) { // Start transition phase
+                    setColorLedState(ledState ? "cyan" : "purple");
+                } else {
+                    setColorLedState("purple"); // Solid purple when starting
+                }
+                ledState = !ledState;
+                lastLedUpdate = millis();
+            }
         }
-    } else {
-        logString("Insufficient magnetometer samples collected.", true);
-        indicateErrorWithLED("purple");
+        delay(MAG_SAMPLE_PERIOD_MS);
     }
+    
+    if (samples >= MIN_MAG_SAMPLES && stats.hasGoodCoverage()) {
+        // Calculate hard iron offset (center of min/max)
+        calibrationData.hardIronOffset = {
+            (maxValues.axis.x + minValues.axis.x) / 2.0f,
+            (maxValues.axis.y + minValues.axis.y) / 2.0f,
+            (maxValues.axis.z + minValues.axis.z) / 2.0f
+        };
+        
+        // Calculate correlations for soft iron matrix
+        float corrXY = 0, corrXZ = 0, corrYZ = 0;
+        float meanX = 0, meanY = 0, meanZ = 0;
+        float varX = 0, varY = 0, varZ = 0;
+        
+        // Calculate means
+        for (int i = 0; i < samples; i++) {
+            meanX += magX[i];
+            meanY += magY[i];
+            meanZ += magZ[i];
+        }
+        meanX /= samples;
+        meanY /= samples;
+        meanZ /= samples;
+        
+        // Calculate variances and correlations
+        for (int i = 0; i < samples; i++) {
+            float dx = magX[i] - meanX;
+            float dy = magY[i] - meanY;
+            float dz = magZ[i] - meanZ;
+            
+            varX += dx * dx;
+            varY += dy * dy;
+            varZ += dz * dz;
+            
+            corrXY += dx * dy;
+            corrXZ += dx * dz;
+            corrYZ += dy * dz;
+        }
+        
+        varX /= samples;
+        varY /= samples;
+        varZ /= samples;
+        corrXY /= samples;
+        corrXZ /= samples;
+        corrYZ /= samples;
+        
+        // Normalize correlations
+        corrXY /= sqrt(varX * varY);
+        corrXZ /= sqrt(varX * varZ);
+        corrYZ /= sqrt(varY * varZ);
+        
+        // Create soft iron matrix with cross-terms
+        float maxRange = sqrt(max(max(varX, varY), varZ));
+        calibrationData.softIronMatrix = {
+            maxRange / sqrt(varX), corrXY * 0.5f, corrXZ * 0.5f,
+            corrXY * 0.5f, maxRange / sqrt(varY), corrYZ * 0.5f,
+            corrXZ * 0.5f, corrYZ * 0.5f, maxRange / sqrt(varZ)
+        };
+        
+        calibrationSuccess = true;
+        logString("Magnetometer calibration successful!", true);
+        logString("Hard iron offsets: ", false);
+        logString(calibrationData.hardIronOffset.axis.x, false); logString(", ", false);
+        logString(calibrationData.hardIronOffset.axis.y, false); logString(", ", false);
+        logString(calibrationData.hardIronOffset.axis.z, true);
+    } else {
+        calibrationSuccess = false;
+        logString("Magnetometer calibration failed - insufficient coverage", true);
+    }
+    
+    calibrationData.valid = calibrationSuccess;
 }
 
 ///////////////////////////////////////////////////////////////////
-// Run Calibration for Gyro, Accel, and Mag
+// Run Calibration Sequence - Simplified
 ///////////////////////////////////////////////////////////////////
 void runCalibrationSequence() {
-    logString("Starting calibration sequence...", true);
+    logString("=== Starting Calibration Sequence ===", true);
+    logString("This will calibrate gyro offset and magnetometer", true);
+    logString("Accelerometer using factory calibration", true);
+    
+    // Start with white flash to indicate calibration start
+    setColorLedState("white");
+    delay(500);
+    setColorLedState("off");
+    delay(500);
+    
+    // Initialize matrices and set validity to false initially
+    calibrationData.valid = false;  // Start with invalid state
     calibrationData.gyroscopeMisalignment = FUSION_IDENTITY_MATRIX;
     calibrationData.accelerometerMisalignment = FUSION_IDENTITY_MATRIX;
-    calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX; // For magnetometer
-
-    // GYRO STAGE DARK BLUE
-    setColorLedState("blue"); // Turn on Blue LED to indicate calibration
-    calibrateGyroscope();
-
-    // ACCEL STAGE GREEN
-    indicateErrorWithLED("green");
-    setColorLedState("green");
-    calibrateAccelerometer();
-
-    // MAG STAGE CYAN
-    setColorLedState("cyan");
-    calibrateMagnetometer();
-
+    calibrationData.softIronMatrix = FUSION_IDENTITY_MATRIX;
+    
+    // Use factory accel calibration
+    calibrationData.accelerometerOffset = {0.0f, 0.0f, 0.0f};
+    calibrationData.accelerometerSensitivity = {1.0f, 1.0f, 1.0f};
+    logString("Using factory accelerometer calibration", true);
+    
+    // Quick gyro offset calibration - BLUE blinking
+    progress.update(1, "Keep device still for gyro offset", 0);
+    logString("=== Quick Gyro Offset Calibration ===", true);
+    logString("Keep device still on flat surface", true);
+    
+    // Three quick blue flashes to indicate start of gyro cal
+    for (int i = 0; i < 3; i++) {
+        setColorLedState("blue");
+        delay(200);
+        setColorLedState("off");
+        delay(200);
+    }
+    
+    float sumX = 0, sumY = 0, sumZ = 0;
+    int samples = 0;
+    unsigned long startTime = millis();
+    
+    // Solid BLUE during gyro calibration
+    setColorLedState("blue");
+    
+    while (samples < GYRO_SAMPLES && (millis() - startTime) < CALIBRATION_TIMEOUT_MS) {
+        if (imuHandler.gyroAvailable()) {
+            float gx, gy, gz;
+            imuHandler.readRawGyro(gx, gy, gz);
+            sumX += gx;
+            sumY += gy;
+            sumZ += gz;
+            samples++;
+        }
+        delay(2);
+    }
+    
+    bool gyroSuccess = (samples >= GYRO_SAMPLES);
+    if (gyroSuccess) {
+        calibrationData.gyroscopeOffset = {
+            sumX / samples,
+            sumY / samples,
+            sumZ / samples
+        };
+        calibrationData.gyroscopeSensitivity = {1.0f, 1.0f, 1.0f};
+        logString("Gyro offset calibration complete", true);
+        
+        // Flash green three times to indicate success
+        for (int i = 0; i < 3; i++) {
+            setColorLedState("green");
+            delay(200);
+            setColorLedState("off");
+            delay(200);
+        }
+    } else {
+        logString("Gyro calibration failed - timeout", true);
+        // Flash red three times to indicate failure
+        for (int i = 0; i < 3; i++) {
+            setColorLedState("red");
+            delay(200);
+            setColorLedState("off");
+            delay(200);
+        }
+    }
+    
+    delay(1000); // Pause before next stage
+    
+    // Only proceed with mag cal if gyro was successful
+    if (gyroSuccess) {
+        // Magnetometer calibration - CYAN/PURPLE pattern
+        progress.update(2, "Magnetometer Calibration - Draw figure-8 patterns", 0);
+        logString("=== Magnetometer Calibration ===", true);
+        logString("1. Hold device level", true);
+        logString("2. Draw figure-8 patterns in the air", true);
+        logString("3. Rotate device to cover all orientations", true);
+        
+        // Three cyan flashes to indicate start of mag cal
+        for (int i = 0; i < 3; i++) {
+            setColorLedState("cyan");
+            delay(200);
+            setColorLedState("off");
+            delay(200);
+        }
+        
+        calibrateMagnetometer();
+    }
+    
+    // Final status indication - make it very distinct from boot sequence
+    if (calibrationData.valid) {
+        // Success pattern: green-white-green-white-green (faster)
+        for (int i = 0; i < 3; i++) {
+            setColorLedState("green");
+            delay(200);
+            setColorLedState("white");
+            delay(200);
+        }
+        setColorLedState("green");
+        delay(500);
+        
+        // Save calibration data
+        saveCalibrationData();
+    } else {
+        // Failure pattern: red-purple-red-purple-red (faster)
+        for (int i = 0; i < 3; i++) {
+            setColorLedState("red");
+            delay(200);
+            setColorLedState("purple");
+            delay(200);
+        }
+        setColorLedState("red");
+        delay(500);
+    }
+    
     setColorLedState("off");
-    logString("Calibration sequence completed.", true);
+    logString("=== Calibration Sequence Completed ===", true);
+    delay(1000); // Give time to see the final state before any potential reboot
 }
