@@ -3,7 +3,7 @@
 ### This project is on pause for the time being, I'm trying to finish my MC server and my OpenChord projects first, BUT I WILL RETURN to this asap. Mainly having issues with the rev 2 BLE board having a different IMU setup. I just can't get it to perform as good as I'd like. 
 Keep your eyes on this, I really want to perfect this proj before the end of 2026
 
-## UPDATE:
+## 2023 UPDATE:
 ### Version 2 update is almost ready for release and I'm very excited to show it off. Performance is unbelievable. The core functionality is basically done and in the V2_Update branch, but there are no docs yet. Those are in progress right now.
 
 #### If you're feeling savvy here's a crash course: Pull the V2 branch, build and upload the platform io project to your ardy, and then connect it to your PC with either the hatire opentrack plugin over USB or the UDP opentrack plugin in combination with the PC_BLE_App included in the repo. 
