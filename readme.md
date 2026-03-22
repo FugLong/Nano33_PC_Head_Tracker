@@ -1,4 +1,8 @@
-# Arduino Nano 33 PC Head Tracker (WIP)
+# Arduino Nano 33 PC Head Tracker (DEPRECATED)
+## 2026 Update:
+### This project is officially being deprecated...Because I have fully rebuilt it from the ground up! The goals are still the same: Open source, cheap, no hassle, ultra-high quality PC head tracking. BUT I have reselected the hardware, redesigned the firmware from scratch, and will soon be finished with a brand new, much better enclosure design and custom PCB. This new head tracking project has finally achieved the performance I have been going for and I won't have to fight the fusion algo for months again. From my testing, out of the box, it can legitimately keep up with any camera based system even Tobii (rotation only for V1 though). The new proj has not been officially named or pushed but will be and then linked here ASAP (literally like a day or two so if you're reading this you are a real one lol). The true V1 release of the new version is still a few months out but the code and system will be fully working before that, just no custom PCB or enclosure right away.
+A short sneak peek: Xiao ESP32 based, BNO086 IMU, WiFi communication to PC (or wired), custom PCB, way smaller and lighter than old design, INSANE tracking performance, nearly 0 latency. No calibration required either, it autocalibrates over time 😍. Not 100% sure on price yet because V1 PCB design is only 85% done but I think overall it should be around 25 USD or less for wired, 50 USD or less for wireless build, both using the custom PCB. Potentially as low as 10-15 for wired, 30-40 for wireless.
+
 ## 2025 Update:
 ### This project is on pause for the time being, I'm trying to finish my MC server and my OpenChord projects first, BUT I WILL RETURN to this asap. Mainly having issues with the rev 2 BLE board having a different IMU setup. I just can't get it to perform as good as I'd like. 
 Keep your eyes on this, I really want to perfect this proj before the end of 2026
